@@ -8,14 +8,17 @@ import java.util.regex.Pattern;
 
 public class Server {
 
-    List<Node> allServerNodes = new LinkedList<>();
-    List<SocketForServer> serverSocketConnectionList = new LinkedList<>();
     ServerSocket server;
     String Id;
     String port;
     String ipAddress;
+    List<Node> allServerNodes = new LinkedList<>();
+    List<SocketForServer> serverSocketConnectionList = new LinkedList<>();
     HashMap<String, SocketForServer> serverSocketConnectionHashMap = new HashMap<>();
 
+    public String getId() {
+        return Id;
+    }
 
     public List<Node> getAllServerNodes() {
         return allServerNodes;
@@ -31,13 +34,15 @@ public class Server {
 
         /*Command parser for server terminal */
         Pattern STATUS = Pattern.compile("^STATUS$");
-
+        Pattern SETUP = Pattern.compile("^SETUP$");
 
         int rx_cmd(Scanner cmd) {
             String cmd_in = null;
             if (cmd.hasNext())
                 cmd_in = cmd.nextLine();
             Matcher m_STATUS = STATUS.matcher(cmd_in);
+            Matcher m_SETUP = SETUP.matcher(cmd_in);
+
 
             if (m_STATUS.find()) {
                 System.out.println("SERVER SOCKET STATUS:");
@@ -49,6 +54,8 @@ public class Server {
                 } catch (Exception e) {
                     System.out.println("SOMETHING WENT WRONG IN TERMINAL COMMAND PROCESSOR");
                 }
+            } else if (m_SETUP.find()) {
+                setupConnections(currentServer);
             }
 
 
@@ -63,6 +70,23 @@ public class Server {
         }
     }
 
+    public void setupConnections(Server current) {
+        try {
+            System.out.println("CONNECTING SERVER");
+            Integer serverId;
+            for (serverId = Integer.valueOf(this.Id) + 1; serverId < allServerNodes.size(); serverId++) {
+                Socket serverConnection = new Socket(this.allServerNodes.get(serverId).getIpAddress(), Integer.valueOf(allServerNodes.get(serverId).getPort()));
+                SocketForServer socketForServer = new SocketForServer(serverConnection, this.getId(), true, current);
+                if (socketForServer.getRemote_id() == null) {
+                    socketForServer.setRemote_id(Integer.toString(serverId));
+                }
+                serverSocketConnectionList.add(socketForServer);
+                serverSocketConnectionHashMap.put(socketForServer.getRemote_id(), socketForServer);
+            }
+        } catch (Exception e) {
+
+        }
+    }
 
     /*reading server file and populating the list*/
     public void setServerList() {

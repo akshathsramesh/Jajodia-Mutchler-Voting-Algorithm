@@ -9,9 +9,7 @@ public class SocketForServer {
     String remote_id;
     BufferedReader in;
     PrintWriter out;
-    Boolean Initiator;
     Server my_master;
-    String numberOfClients;
 
     public String getRemote_id() {
         return remote_id;
@@ -21,7 +19,7 @@ public class SocketForServer {
         this.remote_id = remote_id;
     }
 
-    public SocketForServer(Socket otherClient, String myId, Boolean isServer, Server my_master) {
+    public SocketForServer(Socket otherClient, String myId, Boolean isInitiator, Server my_master) {
         this.otherClient = otherClient;
         this.my_id = myId;
         this.my_master = my_master;
@@ -34,12 +32,11 @@ public class SocketForServer {
         }
 
         try {
-            if(!isServer) {
-                out.println("SEND_CLIENT_ID");
-                System.out.println("SEND_CLIENT_ID request sent");
+            if(!isInitiator) {
+                out.println("SEND_YOUR_ID");
+                System.out.println("SEND_YOUR_ID request sent");
                 remote_id = in.readLine();
-                numberOfClients = in .readLine();
-                System.out.println("SEND_CLIENT_ID request response received with ID: " + remote_id);
+                System.out.println("SEND_YOUR_ID request response received with ID: " + remote_id);
             }
         }
 
@@ -59,8 +56,9 @@ public class SocketForServer {
     public int rx_cmd(BufferedReader cmd,PrintWriter out) {
         try {
             String cmd_in = cmd.readLine();
-            if (cmd_in.equals("SERVER_TEST")) {
-                System.out.println("Test write received from sender");
+            if(cmd_in.equals("SEND_YOUR_ID")){
+                System.out.println("Received SEND_YOUR_ID - Replying with my ID: " + this.my_id);
+                out.println(this.my_id);
             }
 
         }
