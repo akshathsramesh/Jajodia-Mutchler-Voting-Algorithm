@@ -15,28 +15,41 @@ public class dataStructJMVA
     // distinguished site ID
     public int DS;
 
+    public int M;
+
     // counters to identify end of a transaction based on connections available in current partition
     public int target_msg_count;
     public int received_msg_count;
 
     // file locked? boolean flag to atomicize transaction (based on 2-phase commit protocol)
     public boolean locked;
+    public boolean isCopyCurrent;
     HashMap<Integer, DSmessage> voteInfo = null;
+    List<Integer> Logical = null;
+    List<Integer> Physical= null;
     // constructor takes site ID
     dataStructJMVA(int ME)
     {
         this.LVN = 0;
         this.PVN = 0;
-        this.RU = 8;
+        this.RU = 3;
         this.DS = 0;
+        this.M = -1;
         this.locked= false;
+        this.isCopyCurrent= false;
         this.target_msg_count = -1;
         this.received_msg_count = 0;
         this.ME = ME;
-        voteInfo = new HashMap<Integer, DSmessage>();
+        this.voteInfo = new HashMap<Integer, DSmessage>();
+        this.Logical = new LinkedList<Integer>();
+        this.Physical= new LinkedList<Integer>();
     }
 
-    public void clearVoteInfo(){
-        voteInfo = new HashMap<Integer, DSmessage>();
+    public void clearAllInfo(){
+        this.isCopyCurrent = false;
+        this.M = -1;
+        this.voteInfo.clear();
+        this.Logical.clear();
+        this.Physical.clear();
     }
 }

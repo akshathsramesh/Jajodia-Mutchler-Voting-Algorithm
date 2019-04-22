@@ -147,6 +147,7 @@ public class Server {
         int current = -1;
         int target = 0;
         boolean distinguished = false;
+        boolean isCopyCurrent = false;
         DSmessage obj = new DSmessage(LVN, PVN, RU, DS);
         System.out.println("processing INFO_REPLY from S" + requestingClientId);
         System.out.println("LVN = " + LVN);
@@ -161,13 +162,34 @@ public class Server {
         }
         if (target == current) {
             System.out.println("received all INFO_REPLY messages for current partition");
-            // check and proceed with next phase of voting algorithm
-            // check if distinguished partition
-
-            //distinguished == isDistinguished();
+            // put my stats also along with others stats in voteInfo
+            synchronized (votingAlgo.controlWord) {
+                DSmessage my_obj = new DSmessage(votingAlgo.controlWord.LVN, votingAlgo.controlWord.PVN, votingAlgo.controlWord.RU, votingAlgo.controlWord.DS);
+                votingAlgo.controlWord.voteInfo.put(Integer.valueOf(this.Id), my_obj);
+            }
+            // check if partition is distinguished and proceed further
+            distinguished = isDistinguished();
 
             if (distinguished) {
+                // get flag : is file copy current in this site ?
+                synchronized (votingAlgo.controlWord) {
+                    isCopyCurrent = votingAlgo.controlWord.isCopyCurrent;
+                }
+
+                if(isCopyCurrent) {
+                    System.out.println("File copy is current!");
+                } else {
+                    doCatchUp();
+                }
+
+                doUpdateStats();
                 // do more steps
+                // sendMissingUpdates();
+                // unlock site
+                synchronized (votingAlgo.controlWord) {
+                    votingAlgo.controlWord.locked = false;
+                    System.out.println("SITE UNLOCKED due to successful UPDATE and COMMIT");
+                }
             } else {
                 //release lock and send abort to all in current partition
                 System.out.println("Not a distinguished partition: send ABORT to subordinates");
@@ -176,6 +198,95 @@ public class Server {
         }
     }
 
+    public boolean isDistinguished() {
+        // check if distinguished partition
+        boolean exitReturn = false;
+        synchronized (votingAlgo.controlWord) {
+            // get max LVN in M
+            votingAlgo.controlWord.voteInfo.keySet().forEach(key -> {
+                    int tempLVN = votingAlgo.controlWord.voteInfo.get(key).getLVN();
+                    if(votingAlgo.controlWord.M < tempLVN) {
+                        votingAlgo.controlWord.M = tempLVN;
+                    }
+            });
+
+            votingAlgo.controlWord.isCopyCurrent = (votingAlgo.controlWord.Physical.contains(Integer.valueOf(this.Id)));
+            //( votingAlgo.controlWord.M == votingAlgo.controlWord.PVN );
+
+            // gather votes
+            votingAlgo.controlWord.voteInfo.keySet().forEach(key -> {
+                    int tempLVN = votingAlgo.controlWord.voteInfo.get(key).getLVN();
+                    int tempPVN = votingAlgo.controlWord.voteInfo.get(key).getPVN();
+                    if(tempLVN == votingAlgo.controlWord.M) {
+                        votingAlgo.controlWord.Logical.add(key);
+                    }
+                    if(tempPVN == votingAlgo.controlWord.M) {
+                        votingAlgo.controlWord.Physical.add(key);
+                    }
+            });
+
+            if(votingAlgo.controlWord.Physical.isEmpty()) {
+                // S is not in a distinguished partition
+                exitReturn = false;
+            } else {
+                // get RU from any site in logical
+                int N = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Logical.get(0)).getRU();
+                int DS = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Logical.get(0)).getDS();
+                if(votingAlgo.controlWord.Logical.size() > (N/2)) {
+                    // S is in a distinguished partition
+                    exitReturn = true;
+                } else if( (votingAlgo.controlWord.Logical.size() == (N/2)) & (votingAlgo.controlWord.Logical.contains(DS))) {
+                    // S is in a distinguished partition
+                    exitReturn = true;
+                } else {
+                    // S is not in a distinguished partition
+                    exitReturn = false;
+                }
+            }
+        }
+        return exitReturn;
+    }
+
+    public void doCatchUp() {
+        System.out.println("Getting updates from site that has latest copy!");
+        synchronized (votingAlgo.controlWord) {
+            System.out.println("Older version of file = "+votingAlgo.controlWord.PVN);
+            votingAlgo.controlWord.PVN = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Physical.get(0)).getPVN();
+            // TODO : implement re-synchronizing of file copies here
+            System.out.println("Updated version of file = "+votingAlgo.controlWord.PVN);
+        }
+    }
+
+    public void doUpdateStats() {
+        //TODO: do the actual file update here
+        System.out.println("Updating the file for as per current given request");
+        synchronized (votingAlgo.controlWord) {
+            votingAlgo.controlWord.LVN = votingAlgo.controlWord.M + 1;
+            votingAlgo.controlWord.PVN = votingAlgo.controlWord.M + 1;
+            votingAlgo.controlWord.RU  = votingAlgo.controlWord.target_msg_count;
+            // TODO : DS update
+            //votingAlgo.controlWord.DS  = ;
+            serverSocketConnectionHashMap.keySet().forEach(key -> {
+                    serverSocketConnectionHashMap.get(key).sendCommit(votingAlgo.controlWord.LVN,votingAlgo.controlWord.RU,votingAlgo.controlWord.DS);
+            });
+        }
+        
+    }
+
+    // check node lock and process vote request
+    public synchronized void processCommit(String requestingClientId, int LVN, int RU, int DS) {
+        System.out.println("processing COMMIT from S" + requestingClientId);
+        System.out.println("LVN = " + LVN);
+        System.out.println("RU = " + RU);
+        System.out.println("DS = " + DS);
+        synchronized (votingAlgo.controlWord) {
+            votingAlgo.controlWord.LVN = LVN;
+            votingAlgo.controlWord.RU  = RU;
+            votingAlgo.controlWord.DS  = DS;
+            votingAlgo.controlWord.locked = false;
+            System.out.println("SITE UNLOCKED due to COMMIT");
+        }
+    }
 
     /*Open a socket to list to connection request*/
     public void serverSocket(Integer serverId, Server currentServer) {

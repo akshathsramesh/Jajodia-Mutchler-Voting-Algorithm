@@ -18,4 +18,20 @@ public class DSmessage
         this.RU = RU;
         this.DS = DS;
     }
+
+    public int getLVN() {
+        return this.LVN;
+    }
+
+    public int getPVN() {
+        return this.PVN;
+    }
+
+    public int getRU() {
+        return this.RU;
+    }
+
+    public int getDS() {
+        return this.DS;
+    }
 }

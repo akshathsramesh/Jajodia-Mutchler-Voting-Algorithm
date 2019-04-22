@@ -95,6 +95,12 @@ public class SocketForServer {
                     my_master.votingAlgo.controlWord.locked = false;
                     System.out.println("SITE UNLOCKED due to ABORT");
                 }
+            } else if (cmd_in.equals("COMMIT")) {
+                System.out.println("Received COMMIT from S" + this.remote_id);
+                int LVN = Integer.valueOf(in.readLine());
+                int RU = Integer.valueOf(in.readLine());
+                int DS = Integer.valueOf(in.readLine());
+                my_master.processCommit(this.remote_id, LVN, RU, DS);
             } else if (cmd_in.equals("CLOSE_SOCKET")) {
                 String serverRequesting = cmd.readLine();
                 System.out.println("Received close socket from SERVER_ID " + serverRequesting);
@@ -136,6 +142,17 @@ public class SocketForServer {
         out.println("INFO_REPLY");
         out.println(LVN);
         out.println(PVN);
+        out.println(RU);
+        out.println(DS);
+    }
+
+    public synchronized void sendCommit(int LVN, int RU, int DS) {
+        System.out.println("send COMMIT to S" + this.remote_id);
+        System.out.println("LVN = " + LVN);
+        System.out.println("RU = " + RU);
+        System.out.println("DS = " + DS);
+        out.println("COMMIT");
+        out.println(LVN);
         out.println(RU);
         out.println(DS);
     }

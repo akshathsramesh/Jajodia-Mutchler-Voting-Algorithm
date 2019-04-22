@@ -53,8 +53,8 @@ public class JMVAlgorithm
         synchronized(controlWord)
         {
             controlWord.locked = true;
-            controlWord.clearVoteInfo();
-            System.out.println("SITE LOCKED for request to update");
+            controlWord.clearAllInfo();
+            System.out.println("SITE LOCKED for new update request");
 
             // set variables;
             controlWord.target_msg_count = my_master.serverSocketConnectionHashMap.size();
@@ -74,7 +74,7 @@ public class JMVAlgorithm
         synchronized(controlWord)
         {
             controlWord.locked = false;
-            controlWord.clearVoteInfo();
+            controlWord.clearAllInfo();
             System.out.println("SITE UNLOCKED due to ABORT");
 
             // set variables;
