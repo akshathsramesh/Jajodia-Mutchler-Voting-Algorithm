@@ -41,16 +41,18 @@ public class Server {
         Pattern STATUS = Pattern.compile("^STATUS$");
         Pattern SETUP = Pattern.compile("^SETUP$");
         Pattern WRITE = Pattern.compile("^WR$");
-        Pattern LIST  = Pattern.compile("^LIST$");
+        Pattern LIST = Pattern.compile("^LIST$");
+        Pattern CLOSE_SOKCET = Pattern.compile("^CLOSE_SOKCET$");
 
         int rx_cmd(Scanner cmd) {
             String cmd_in = null;
             if (cmd.hasNext())
                 cmd_in = cmd.nextLine();
             Matcher m_STATUS = STATUS.matcher(cmd_in);
-            Matcher m_LIST= LIST.matcher(cmd_in);
+            Matcher m_LIST = LIST.matcher(cmd_in);
             Matcher m_SETUP = SETUP.matcher(cmd_in);
             Matcher m_WRITE = WRITE.matcher(cmd_in);
+            Matcher m_CLOSE_SOCKET = CLOSE_SOKCET.matcher(cmd_in);
 
 
             if (m_STATUS.find()) {
@@ -67,17 +69,17 @@ public class Server {
                 setupConnections(currentServer);
             } else if (m_WRITE.find()) {
                 currentServer.votingAlgo.requestUpdate();
-            } else if(m_LIST.find()) { 
-                synchronized (serverSocketConnectionHashMap)
-                {
+            } else if (m_LIST.find()) {
+                synchronized (serverSocketConnectionHashMap) {
                     System.out.println("\n=== Connections to servers ===");
                     serverSocketConnectionHashMap.keySet().forEach(key -> {
-                    System.out.println("key:"+key + " => ID " + serverSocketConnectionHashMap.get(key).remote_id);
+                        System.out.println("key:" + key + " => ID " + serverSocketConnectionHashMap.get(key).remote_id);
                     });
-                    System.out.println("=== size ="+serverSocketConnectionHashMap.size());
+                    System.out.println("=== size =" + serverSocketConnectionHashMap.size());
                 }
-            }            
-
+            } else if (m_CLOSE_SOCKET.find()) {
+                testCloseSocket();
+            }
 
             return 1;
         }
@@ -108,6 +110,10 @@ public class Server {
         }
     }
 
+    public synchronized void testCloseSocket() {
+        serverSocketConnectionHashMap.get("0").closeSocketServer();
+    }
+
     /*reading server file and populating the list*/
     public void setServerList() {
         try {
@@ -135,32 +141,32 @@ public class Server {
         }
     }
 
+
     // check node lock and process vote request
-    public synchronized void processInfoReply(String requestingClientId,int LVN,int PVN,int RU,int DS){
+    public synchronized void processInfoReply(String requestingClientId, int LVN, int PVN, int RU, int DS) {
         int current = -1;
         int target = 0;
         boolean distinguished = false;
-        DSmessage obj = new DSmessage(LVN,PVN,RU,DS);
+        DSmessage obj = new DSmessage(LVN, PVN, RU, DS);
         System.out.println("processing INFO_REPLY from S" + requestingClientId);
         System.out.println("LVN = " + LVN);
         System.out.println("PVN = " + PVN);
         System.out.println("RU = " + RU);
         System.out.println("DS = " + DS);
-        synchronized(votingAlgo.controlWord)
-        {
+        synchronized (votingAlgo.controlWord) {
             ++votingAlgo.controlWord.received_msg_count;
-            votingAlgo.controlWord.voteInfo.put(Integer.valueOf(requestingClientId),obj);
+            votingAlgo.controlWord.voteInfo.put(Integer.valueOf(requestingClientId), obj);
             current = votingAlgo.controlWord.received_msg_count;
-            target  = votingAlgo.controlWord.target_msg_count;
+            target = votingAlgo.controlWord.target_msg_count;
         }
-        if(target == current){
+        if (target == current) {
             System.out.println("received all INFO_REPLY messages for current partition");
             // check and proceed with next phase of voting algorithm
             // check if distinguished partition
 
             //distinguished == isDistinguished();
-            
-            if(distinguished){
+
+            if (distinguished) {
                 // do more steps
             } else {
                 //release lock and send abort to all in current partition
@@ -169,6 +175,7 @@ public class Server {
             }
         }
     }
+
 
     /*Open a socket to list to connection request*/
     public void serverSocket(Integer serverId, Server currentServer) {
