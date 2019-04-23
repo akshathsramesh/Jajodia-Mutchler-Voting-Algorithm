@@ -183,11 +183,16 @@ public class Server {
                 }
 
                 doUpdateStats();
-                // do more steps
+                // TODO:
                 // sendMissingUpdates();
                 // unlock site
                 synchronized (votingAlgo.controlWord) {
                     votingAlgo.controlWord.locked = false;
+                    System.out.println("Site STATS");
+                    System.out.println("LVN = " + votingAlgo.controlWord.LVN);
+                    System.out.println("PVN = " + votingAlgo.controlWord.PVN);
+                    System.out.println("RU = " + votingAlgo.controlWord.RU);
+                    System.out.println("DS = " + votingAlgo.controlWord.DS);
                     System.out.println("SITE UNLOCKED due to successful UPDATE and COMMIT");
                 }
             } else {
@@ -225,6 +230,9 @@ public class Server {
                     }
             });
 
+            System.out.println("Physical = "+votingAlgo.controlWord.Physical);
+            System.out.println("Logical  = "+votingAlgo.controlWord.Logical);
+
             if(votingAlgo.controlWord.Physical.isEmpty()) {
                 // S is not in a distinguished partition
                 exitReturn = false;
@@ -252,38 +260,57 @@ public class Server {
         synchronized (votingAlgo.controlWord) {
             System.out.println("Older version of file = "+votingAlgo.controlWord.PVN);
             votingAlgo.controlWord.PVN = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Physical.get(0)).getPVN();
-            // TODO : implement re-synchronizing of file copies here
+            // TODO: implement re-synchronizing of file copies here
             System.out.println("Updated version of file = "+votingAlgo.controlWord.PVN);
         }
     }
 
     public void doUpdateStats() {
-        //TODO: do the actual file update here
+        // TODO: do the actual file update here
         System.out.println("Updating the file for as per current given request");
         synchronized (votingAlgo.controlWord) {
             votingAlgo.controlWord.LVN = votingAlgo.controlWord.M + 1;
             votingAlgo.controlWord.PVN = votingAlgo.controlWord.M + 1;
             votingAlgo.controlWord.RU  = votingAlgo.controlWord.target_msg_count;
-            // TODO : DS update
-            //votingAlgo.controlWord.DS  = ;
+            // TODO: DS update
+            // votingAlgo.controlWord.DS  = ;
             serverSocketConnectionHashMap.keySet().forEach(key -> {
-                    serverSocketConnectionHashMap.get(key).sendCommit(votingAlgo.controlWord.LVN,votingAlgo.controlWord.RU,votingAlgo.controlWord.DS);
+                if(votingAlgo.controlWord.Physical.contains(Integer.valueOf(key))) {
+                    //System.out.println("Physical contains "+key);
+                    serverSocketConnectionHashMap.get(key).sendCommit(votingAlgo.controlWord.LVN,votingAlgo.controlWord.RU,votingAlgo.controlWord.DS,"UPDATE_FILE");
+                } else {
+                    //System.out.println("Physical not contains "+key);
+                    serverSocketConnectionHashMap.get(key).sendCommit(votingAlgo.controlWord.LVN,votingAlgo.controlWord.RU,votingAlgo.controlWord.DS,"NULL");
+                }
             });
         }
         
     }
 
     // check node lock and process vote request
-    public synchronized void processCommit(String requestingClientId, int LVN, int RU, int DS) {
+    public synchronized void processCommit(String requestingClientId, int LVN, int RU, int DS, String update) {
         System.out.println("processing COMMIT from S" + requestingClientId);
         System.out.println("LVN = " + LVN);
         System.out.println("RU = " + RU);
         System.out.println("DS = " + DS);
+        System.out.println("update_command = " + update);
         synchronized (votingAlgo.controlWord) {
             votingAlgo.controlWord.LVN = LVN;
             votingAlgo.controlWord.RU  = RU;
             votingAlgo.controlWord.DS  = DS;
+            Pattern UPDATE = Pattern.compile("^UPDATE_FILE$");
+            Matcher m_UPDATE = UPDATE.matcher(update);
+            if(m_UPDATE.find()) {
+                // TODO: update file here pulled from commit message
+                System.out.println("File also updated with commit");
+                votingAlgo.controlWord.PVN = LVN;
+            }
             votingAlgo.controlWord.locked = false;
+            System.out.println("Site STATS");
+            System.out.println("LVN = " + votingAlgo.controlWord.LVN);
+            System.out.println("PVN = " + votingAlgo.controlWord.PVN);
+            System.out.println("RU = " + votingAlgo.controlWord.RU);
+            System.out.println("DS = " + votingAlgo.controlWord.DS);
             System.out.println("SITE UNLOCKED due to COMMIT");
         }
     }

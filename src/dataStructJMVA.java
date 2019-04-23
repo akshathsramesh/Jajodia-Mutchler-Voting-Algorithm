@@ -41,11 +41,11 @@ public class dataStructJMVA
         this.received_msg_count = 0;
         this.ME = ME;
         this.voteInfo = new HashMap<Integer, DSmessage>();
-        this.Logical = new LinkedList<Integer>();
-        this.Physical= new LinkedList<Integer>();
+        this.Logical  = new LinkedList<Integer>();
+        this.Physical = new LinkedList<Integer>();
     }
 
-    public void clearAllInfo(){
+    public void clearAllInfo() {
         this.isCopyCurrent = false;
         this.M = -1;
         this.voteInfo.clear();

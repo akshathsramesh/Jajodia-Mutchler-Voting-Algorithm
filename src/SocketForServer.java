@@ -100,7 +100,8 @@ public class SocketForServer {
                 int LVN = Integer.valueOf(in.readLine());
                 int RU = Integer.valueOf(in.readLine());
                 int DS = Integer.valueOf(in.readLine());
-                my_master.processCommit(this.remote_id, LVN, RU, DS);
+                String update = in.readLine();
+                my_master.processCommit(this.remote_id, LVN, RU, DS, update);
             } else if (cmd_in.equals("CLOSE_SOCKET")) {
                 String serverRequesting = cmd.readLine();
                 System.out.println("Received close socket from SERVER_ID " + serverRequesting);
@@ -146,15 +147,17 @@ public class SocketForServer {
         out.println(DS);
     }
 
-    public synchronized void sendCommit(int LVN, int RU, int DS) {
+    public synchronized void sendCommit(int LVN, int RU, int DS, String update) {
         System.out.println("send COMMIT to S" + this.remote_id);
         System.out.println("LVN = " + LVN);
         System.out.println("RU = " + RU);
         System.out.println("DS = " + DS);
+        System.out.println("update_command = " + update);
         out.println("COMMIT");
         out.println(LVN);
         out.println(RU);
         out.println(DS);
+        out.println(update);
     }
 
     public synchronized void closeSocketServer() {
