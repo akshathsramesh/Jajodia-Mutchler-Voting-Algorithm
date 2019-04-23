@@ -215,9 +215,6 @@ public class Server {
                     }
             });
 
-            votingAlgo.controlWord.isCopyCurrent = (votingAlgo.controlWord.Physical.contains(Integer.valueOf(this.Id)));
-            //( votingAlgo.controlWord.M == votingAlgo.controlWord.PVN );
-
             // gather votes
             votingAlgo.controlWord.voteInfo.keySet().forEach(key -> {
                     int tempLVN = votingAlgo.controlWord.voteInfo.get(key).getLVN();
@@ -232,6 +229,9 @@ public class Server {
 
             System.out.println("Physical = "+votingAlgo.controlWord.Physical);
             System.out.println("Logical  = "+votingAlgo.controlWord.Logical);
+            votingAlgo.controlWord.isCopyCurrent = (votingAlgo.controlWord.Physical.contains(Integer.valueOf(this.Id)));
+            //System.out.println("isCopyCurrent = "+votingAlgo.controlWord.isCopyCurrent);
+            //( votingAlgo.controlWord.M == votingAlgo.controlWord.PVN );
 
             if(votingAlgo.controlWord.Physical.isEmpty()) {
                 // S is not in a distinguished partition
