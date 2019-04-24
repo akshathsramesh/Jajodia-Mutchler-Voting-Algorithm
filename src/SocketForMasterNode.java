@@ -56,16 +56,23 @@ public class SocketForMasterNode {
         try {
             String cmd_in = cmd.readLine();
 
-            if (cmd_in.equals("SEND_CLIENT_ID")) {
+            if (cmd_in.equals("SEND_YOUR_ID")) {
+                System.out.println("Received SEND_YOUR_ID - Replying with my ID: " + this.my_id);
                 out.println(this.my_id);
-                out.println(this.numberOfClients);
-            } else if (cmd_in.equals("CLIENT_TEST")) {
+            }
+
+            else if (cmd_in.equals("CLIENT_TEST")) {
                 System.out.println("CLIENT TEST RECEIVED");
             }
 
         } catch (Exception e) {
         }
         return 1;
+    }
+
+    public synchronized void testConnection(){
+        System.out.println("Sending .... Master to Server ID test connection packer to server " );
+        out.println("TEST_MASTER_SERVER_CONNECTION");
     }
 
 }
