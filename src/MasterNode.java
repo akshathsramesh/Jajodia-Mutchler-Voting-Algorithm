@@ -1,3 +1,5 @@
+import javafx.scene.shape.PathElement;
+
 import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -45,13 +47,14 @@ public class MasterNode {
 
         /*Pattern matching, command parsing from terminal*/
         Pattern STATUS = Pattern.compile("^STATUS$");
-
+        Pattern TEST_CONNECTION = Pattern.compile("^TEST_CONNECTION$");
 
         int rx_cmd(Scanner cmd) {
             String cmd_in = null;
             if (cmd.hasNext())
                 cmd_in = cmd.nextLine();
             Matcher m_STATUS = STATUS.matcher(cmd_in);
+            Matcher m_TEST_CONNECTION = TEST_CONNECTION.matcher(cmd_in);
 
 
             if (m_STATUS.find()) {
@@ -64,8 +67,14 @@ public class MasterNode {
                 } catch (Exception e) {
                     System.out.println("SOMETHING WENT WRONG IN TERMINAL COMMAND PROCESSOR");
                 }
-
             }
+            else if(m_TEST_CONNECTION.find()){
+                Integer severId;
+                for (severId =0 ; severId < socketConnectionListServer.size(); severId+=1){
+                    socketConnectionListServer.get(severId).testConnection();
+                }
+            }
+
             return 1;
         }
 

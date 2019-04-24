@@ -14,14 +14,6 @@ public class SocketForServer {
     PrintWriter out;
     Server my_master;
 
-    public String getRemote_id() {
-        return remote_id;
-    }
-
-    public void setRemote_id(String remote_id) {
-        this.remote_id = remote_id;
-    }
-
     public SocketForServer(Socket otherClient, String myId, Boolean isInitiator, Server my_master) {
         this.otherClient = otherClient;
         this.my_id = myId;
@@ -38,7 +30,7 @@ public class SocketForServer {
                 out.println("SEND_YOUR_ID");
                 System.out.println("SEND_YOUR_ID request sent");
                 remote_id = in.readLine();
-                System.out.println("SEND_YOUR_ID request response received with ID: " + remote_id);
+                System.out.println("SEND_YOUR_ID request: response received with ID: " + remote_id);
             }
         } catch (Exception e) {
 
@@ -54,6 +46,13 @@ public class SocketForServer {
         read.start();
     }
 
+    public String getRemote_id() {
+        return remote_id;
+    }
+
+    public void setRemote_id(String remote_id) {
+        this.remote_id = remote_id;
+    }
 
     public int rx_cmd(BufferedReader cmd, PrintWriter out) {
         try {
@@ -124,6 +123,10 @@ public class SocketForServer {
                 System.out.println("Received close socket ACK from SERVER_ID " + serverRequesting);
                 otherClient.close();
                 return 0;
+            }
+
+            else if(cmd_in.equals("TEST_MASTER_SERVER_CONNECTION")){
+                System.out.println("Received test packet for master and sever connection");
             }
 
         } catch (Exception e) {
