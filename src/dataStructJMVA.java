@@ -53,6 +53,7 @@ public class dataStructJMVA
         this.voteInfo.clear();
         this.Logical.clear();
         this.Physical.clear();
+        // TODO: possible bug
         this.Updates.clear();
     }
 }
