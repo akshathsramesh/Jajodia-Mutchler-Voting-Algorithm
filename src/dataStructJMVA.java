@@ -27,6 +27,7 @@ public class dataStructJMVA
     HashMap<Integer, DSmessage> voteInfo = null;
     List<Integer> Logical = null;
     List<Integer> Physical= null;
+    List<String> Updates= null;
     // constructor takes site ID
     dataStructJMVA(int ME)
     {
@@ -43,6 +44,7 @@ public class dataStructJMVA
         this.voteInfo = new HashMap<Integer, DSmessage>();
         this.Logical  = new LinkedList<Integer>();
         this.Physical = new LinkedList<Integer>();
+        this.Updates  = new LinkedList<String>();
     }
 
     public void clearAllInfo() {
@@ -51,5 +53,6 @@ public class dataStructJMVA
         this.voteInfo.clear();
         this.Logical.clear();
         this.Physical.clear();
+        this.Updates.clear();
     }
 }

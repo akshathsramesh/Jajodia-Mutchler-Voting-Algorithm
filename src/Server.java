@@ -146,8 +146,6 @@ public class Server {
     public synchronized void processInfoReply(String requestingClientId, int LVN, int PVN, int RU, int DS) {
         int current = -1;
         int target = 0;
-        boolean distinguished = false;
-        boolean isCopyCurrent = false;
         DSmessage obj = new DSmessage(LVN, PVN, RU, DS);
         System.out.println("processing INFO_REPLY from S" + requestingClientId);
         System.out.println("LVN = " + LVN);
@@ -162,45 +160,59 @@ public class Server {
         }
         if (target == current) {
             System.out.println("received all INFO_REPLY messages for current partition");
-            // put my stats also along with others stats in voteInfo
-            synchronized (votingAlgo.controlWord) {
-                DSmessage my_obj = new DSmessage(votingAlgo.controlWord.LVN, votingAlgo.controlWord.PVN, votingAlgo.controlWord.RU, votingAlgo.controlWord.DS);
-                votingAlgo.controlWord.voteInfo.put(Integer.valueOf(this.Id), my_obj);
-            }
-            // check if partition is distinguished and proceed further
-            distinguished = isDistinguished();
-
-            if (distinguished) {
-                // get flag : is file copy current in this site ?
-                synchronized (votingAlgo.controlWord) {
-                    isCopyCurrent = votingAlgo.controlWord.isCopyCurrent;
-                }
-
-                if(isCopyCurrent) {
-                    System.out.println("File copy is current!");
-                } else {
-                    doCatchUp();
-                }
-
-                doUpdateStats();
-                // TODO:
-                // sendMissingUpdates();
-                // unlock site
-                synchronized (votingAlgo.controlWord) {
-                    votingAlgo.controlWord.locked = false;
-                    System.out.println("Site STATS");
-                    System.out.println("LVN = " + votingAlgo.controlWord.LVN);
-                    System.out.println("PVN = " + votingAlgo.controlWord.PVN);
-                    System.out.println("RU = " + votingAlgo.controlWord.RU);
-                    System.out.println("DS = " + votingAlgo.controlWord.DS);
-                    System.out.println("SITE UNLOCKED due to successful UPDATE and COMMIT");
-                }
-            } else {
-                //release lock and send abort to all in current partition
-                System.out.println("Not a distinguished partition: send ABORT to subordinates");
-                votingAlgo.releaseAbort();
-            }
+            executeVotingAlgorithm(requestingClientId,LVN,PVN,RU,DS);
         }
+    }
+
+    public void executeVotingAlgorithm(String requestingClientId, int LVN, int PVN, int RU, int DS) {
+        boolean distinguished = false;
+        boolean isCopyCurrent = false;
+        synchronized (votingAlgo.controlWord) {
+            // put my stats also along with others stats in voteInfo
+            DSmessage my_obj = new DSmessage(votingAlgo.controlWord.LVN, votingAlgo.controlWord.PVN, votingAlgo.controlWord.RU, votingAlgo.controlWord.DS);
+            votingAlgo.controlWord.voteInfo.put(Integer.valueOf(this.Id), my_obj);
+        }
+        // check if partition is distinguished and proceed further
+        distinguished = isDistinguished();
+
+        if (distinguished) {
+            // get flag : is file copy current in this site ?
+            synchronized (votingAlgo.controlWord) {
+                isCopyCurrent = votingAlgo.controlWord.isCopyCurrent;
+            }
+
+            if(isCopyCurrent) {
+                System.out.println("File copy is current!");
+            } else {
+                doCatchUp();
+            }
+
+            doUpdateStats();
+            // sendMissingUpdates();
+            synchronized (votingAlgo.controlWord) {
+                serverSocketConnectionHashMap.keySet().forEach(key -> {
+                    if(!votingAlgo.controlWord.Physical.contains(Integer.valueOf(key))) {
+                        //System.out.println("Physical does not contain "+key);
+                        serverSocketConnectionHashMap.get(key).sendMissingUpdates(votingAlgo.controlWord.voteInfo.get(key).getPVN());
+                    }
+                });
+            }
+            // unlock site
+            synchronized (votingAlgo.controlWord) {
+                votingAlgo.controlWord.locked = false;
+                System.out.println("Site STATS");
+                System.out.println("LVN = " + votingAlgo.controlWord.LVN);
+                System.out.println("PVN = " + votingAlgo.controlWord.PVN);
+                System.out.println("RU = " + votingAlgo.controlWord.RU);
+                System.out.println("DS = " + votingAlgo.controlWord.DS);
+                System.out.println("SITE UNLOCKED due to successful UPDATE and COMMIT");
+            }
+        } else {
+            //release lock and send abort to all in current partition
+            System.out.println("Not a distinguished partition: send ABORT to subordinates");
+            votingAlgo.releaseAbort();
+        }
+    
     }
 
     public boolean isDistinguished() {
@@ -259,6 +271,13 @@ public class Server {
         System.out.println("Getting updates from site that has latest copy!");
         synchronized (votingAlgo.controlWord) {
             System.out.println("Older version of file = "+votingAlgo.controlWord.PVN);
+            serverSocketConnectionHashMap.get(votingAlgo.controlWord.Physical.get(0)).sendGetMissingUpdates(votingAlgo.controlWord.PVN);
+            try {
+                votingAlgo.controlWord.wait();
+            }
+            catch (InterruptedException e) {
+                System.out.println("interrupt");
+            }
             votingAlgo.controlWord.PVN = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Physical.get(0)).getPVN();
             // TODO: implement re-synchronizing of file copies here
             System.out.println("Updated version of file = "+votingAlgo.controlWord.PVN);
@@ -298,9 +317,9 @@ public class Server {
             votingAlgo.controlWord.LVN = LVN;
             votingAlgo.controlWord.RU  = RU;
             votingAlgo.controlWord.DS  = DS;
-            Pattern UPDATE = Pattern.compile("^UPDATE_FILE$");
-            Matcher m_UPDATE = UPDATE.matcher(update);
-            if(m_UPDATE.find()) {
+            Pattern NULL = Pattern.compile("^NULL$");
+            Matcher m_NULL = NULL.matcher(update);
+            if(!m_NULL.find()) {
                 // TODO: update file here pulled from commit message
                 System.out.println("File also updated with commit");
                 votingAlgo.controlWord.PVN = LVN;

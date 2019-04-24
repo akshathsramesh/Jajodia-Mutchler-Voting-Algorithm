@@ -2,6 +2,9 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.io.*;
 
 public class SocketForServer {
     Socket otherClient;
@@ -95,6 +98,13 @@ public class SocketForServer {
                     my_master.votingAlgo.controlWord.locked = false;
                     System.out.println("SITE UNLOCKED due to ABORT");
                 }
+            } else if (cmd_in.equals("GET_MISSING_UPDATES")) {
+                System.out.println("Received GET_MISSING_UPDATES from S" + this.remote_id);
+                int rPVN = Integer.valueOf(in.readLine());
+                sendMissingUpdates(rPVN);
+            } else if (cmd_in.equals("MISSING_UPDATES")) {
+                System.out.println("Received MISSING_UPDATES from S" + this.remote_id);
+                processMissingUpdates();
             } else if (cmd_in.equals("COMMIT")) {
                 System.out.println("Received COMMIT from S" + this.remote_id);
                 int LVN = Integer.valueOf(in.readLine());
@@ -129,6 +139,49 @@ public class SocketForServer {
         out.println("VOTE_REQUEST");
     }
 
+    public synchronized void sendMissingUpdates(int remotePVN) {
+        System.out.println("send MISSING_UPDATES to" + this.remote_id);
+        out.println("MISSING_UPDATES");
+        synchronized (my_master.votingAlgo.controlWord) {
+            for(int i = remotePVN-1;i<my_master.votingAlgo.controlWord.Updates.size();i++) {
+                out.println(my_master.votingAlgo.controlWord.Updates.get(i));
+            }
+            out.println("EOM");
+        }
+    }
+
+    public synchronized void processMissingUpdates() {
+        System.out.println("processing MISSING_UPDATES got from S" + this.remote_id);
+        Pattern eom = Pattern.compile("^EOM");
+        String rd_in = null;
+        Matcher m_eom = eom.matcher("start");  // initializing the matcher. "start" does not mean anything
+        // get filenames till EOM message is received and update the files list
+        try
+        {
+            while(!m_eom.find())
+            {
+                rd_in = in.readLine();
+                m_eom = eom.matcher(rd_in);
+                if(!m_eom.find())
+                {
+                    String update = rd_in;
+                    synchronized (my_master.votingAlgo.controlWord) {
+                        my_master.votingAlgo.controlWord.Updates.add(update);
+                    }
+                } 
+                else { break; }  // break out of loop when EOM is received
+            }
+        }
+        catch (IOException e) 
+        {
+        	System.out.println("Read failed");
+        	System.exit(-1);
+        }
+        synchronized (my_master.votingAlgo.controlWord) {
+            my_master.votingAlgo.controlWord.notifyAll();
+        }
+    }
+
     public synchronized void sendAbort() {
         System.out.println("send ABORT to" + this.remote_id);
         out.println("ABORT");
@@ -158,6 +211,13 @@ public class SocketForServer {
         out.println(RU);
         out.println(DS);
         out.println(update);
+    }
+
+    public synchronized void sendGetMissingUpdates(int PVN) {
+        System.out.println("send GET_MISSING_UPDATES to S" + this.remote_id);
+        System.out.println("PVN = " + PVN);
+        out.println("GET_MISSING_UPDATES");
+        out.println(PVN);
     }
 
     public synchronized void closeSocketServer() {
