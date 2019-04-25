@@ -78,13 +78,13 @@ public class SocketForMasterNode {
     }
 
     public synchronized void dropConnection(String toSeverID, String dropConnectionWith){
-        System.out.println(" SENDING DROP CONNECTION WITH" + dropConnectionWith + " TO Sever ID " + toSeverID);
+        System.out.println(" SENDING DROP CONNECTION WITH " + dropConnectionWith + " TO Sever ID " + toSeverID);
         out.println("DROP_CONNECTION");
         out.println(dropConnectionWith);
     }
 
     public synchronized void rejoinConnection(String toSeverID, String rejoinConnectionWith){
-        System.out.println(" SENDING DROP CONNECTION WITH" + rejoinConnectionWith + " TO Sever ID " + toSeverID);
+        System.out.println(" SENDING REJOIN CONNECTION WITH" + rejoinConnectionWith + " TO Sever ID " + toSeverID);
         out.println("REJOIN_CONNECTION");
         out.println(rejoinConnectionWith);
     }
