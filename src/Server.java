@@ -13,10 +13,25 @@ public class Server {
     String port;
     String ipAddress;
     List<Node> allServerNodes = new LinkedList<>();
-    List<SocketForServer> serverSocketConnectionList = new LinkedList<>();
     HashMap<String, SocketForServer> serverSocketConnectionHashMap = new HashMap<>();
     JMVAlgorithm votingAlgo = null;
-    Integer dropConnectionCouter;
+    Integer dropConnectionCounter;
+
+    public static void main(String[] args) {
+
+
+        if (args.length != 1) {
+            System.out.println("Usage: java Server <server-number>");
+            System.exit(1);
+        }
+
+        System.out.println("Starting the Server");
+        Server server = new Server();
+        server.setServerList();// set server list
+        server.serverSocket(Integer.valueOf(args[0]), server); // reserve a socket
+        server.createVotingAlgorithmInstance();
+        System.out.println("Started the Server");
+    }
 
     public String getId() {
         return Id;
@@ -30,69 +45,6 @@ public class Server {
         this.votingAlgo = new JMVAlgorithm(this);
     }
 
-    public class CommandParser extends Thread {
-
-        Server currentServer;
-
-        public CommandParser(Server currentServer) {
-            this.currentServer = currentServer;
-        }
-
-        /*Command parser for server terminal */
-        Pattern STATUS = Pattern.compile("^STATUS$");
-        Pattern SETUP = Pattern.compile("^SETUP$");
-        Pattern WRITE = Pattern.compile("^WR$");
-        Pattern LIST = Pattern.compile("^LIST$");
-        Pattern CLOSE_SOCKET = Pattern.compile("^CLOSE_SOCKET$");
-
-        int rx_cmd(Scanner cmd) {
-            String cmd_in = null;
-            if (cmd.hasNext())
-                cmd_in = cmd.nextLine();
-            Matcher m_STATUS = STATUS.matcher(cmd_in);
-            Matcher m_LIST = LIST.matcher(cmd_in);
-            Matcher m_SETUP = SETUP.matcher(cmd_in);
-            Matcher m_WRITE = WRITE.matcher(cmd_in);
-            Matcher m_CLOSE_SOCKET = CLOSE_SOCKET.matcher(cmd_in);
-
-
-            if (m_STATUS.find()) {
-                System.out.println("SERVER SOCKET STATUS:");
-                try {
-                    System.out.println("STATUS UP");
-                    System.out.println("SERVER ID: " + Id);
-                    System.out.println("SERVER IP ADDRESS: " + ipAddress);
-                    System.out.println("SERVER PORT: " + port);
-                } catch (Exception e) {
-                    System.out.println("SOMETHING WENT WRONG IN TERMINAL COMMAND PROCESSOR");
-                }
-            } else if (m_SETUP.find()) {
-                setupConnections(currentServer);
-            } else if (m_WRITE.find()) {
-                currentServer.votingAlgo.requestUpdate();
-            } else if (m_LIST.find()) {
-                synchronized (serverSocketConnectionHashMap) {
-                    System.out.println("\n=== Connections to servers ===");
-                    serverSocketConnectionHashMap.keySet().forEach(key -> {
-                        System.out.println("key:" + key + " => ID " + serverSocketConnectionHashMap.get(key).remote_id);
-                    });
-                    System.out.println("=== size =" + serverSocketConnectionHashMap.size());
-                }
-            } else if (m_CLOSE_SOCKET.find()) {
-                testCloseSocket();
-            }
-
-            return 1;
-        }
-
-        public void run() {
-            System.out.println("Enter commands to set-up MESH Connection : TRIGGER");
-            Scanner input = new Scanner(System.in);
-            while (rx_cmd(input) != 0) {
-            }
-        }
-    }
-
     public void setupConnections(Server current) {
         try {
             System.out.println("CONNECTING SERVER");
@@ -103,11 +55,10 @@ public class Server {
                 if (socketForServer.getRemote_id() == null) {
                     socketForServer.setRemote_id(Integer.toString(serverId));
                 }
-                serverSocketConnectionList.add(socketForServer);
                 serverSocketConnectionHashMap.put(socketForServer.getRemote_id(), socketForServer);
             }
         } catch (Exception e) {
-
+            System.out.println("Error while connecting to server");
         }
     }
 
@@ -161,7 +112,7 @@ public class Server {
         }
         if (target == current) {
             System.out.println("received all INFO_REPLY messages for current partition");
-            executeVotingAlgorithm(requestingClientId,LVN,PVN,RU,DS);
+            executeVotingAlgorithm(requestingClientId, LVN, PVN, RU, DS);
         }
     }
 
@@ -182,7 +133,7 @@ public class Server {
                 isCopyCurrent = votingAlgo.controlWord.isCopyCurrent;
             }
 
-            if(isCopyCurrent) {
+            if (isCopyCurrent) {
                 System.out.println("File copy is current!");
             } else {
                 doCatchUp();
@@ -192,7 +143,7 @@ public class Server {
             // sendMissingUpdates();
             synchronized (votingAlgo.controlWord) {
                 serverSocketConnectionHashMap.keySet().forEach(key -> {
-                    if(!votingAlgo.controlWord.Physical.contains(Integer.valueOf(key))) {
+                    if (!votingAlgo.controlWord.Physical.contains(Integer.valueOf(key))) {
                         //System.out.println("Physical does not contain "+key);
                         serverSocketConnectionHashMap.get(key).sendMissingUpdates(votingAlgo.controlWord.voteInfo.get(key).getPVN());
                     }
@@ -213,7 +164,7 @@ public class Server {
             System.out.println("Not a distinguished partition: send ABORT to subordinates");
             votingAlgo.releaseAbort();
         }
-    
+
     }
 
     public boolean isDistinguished() {
@@ -222,41 +173,41 @@ public class Server {
         synchronized (votingAlgo.controlWord) {
             // get max LVN in M
             votingAlgo.controlWord.voteInfo.keySet().forEach(key -> {
-                    int tempLVN = votingAlgo.controlWord.voteInfo.get(key).getLVN();
-                    if(votingAlgo.controlWord.M < tempLVN) {
-                        votingAlgo.controlWord.M = tempLVN;
-                    }
+                int tempLVN = votingAlgo.controlWord.voteInfo.get(key).getLVN();
+                if (votingAlgo.controlWord.M < tempLVN) {
+                    votingAlgo.controlWord.M = tempLVN;
+                }
             });
 
             // gather votes
             votingAlgo.controlWord.voteInfo.keySet().forEach(key -> {
-                    int tempLVN = votingAlgo.controlWord.voteInfo.get(key).getLVN();
-                    int tempPVN = votingAlgo.controlWord.voteInfo.get(key).getPVN();
-                    if(tempLVN == votingAlgo.controlWord.M) {
-                        votingAlgo.controlWord.Logical.add(key);
-                    }
-                    if(tempPVN == votingAlgo.controlWord.M) {
-                        votingAlgo.controlWord.Physical.add(key);
-                    }
+                int tempLVN = votingAlgo.controlWord.voteInfo.get(key).getLVN();
+                int tempPVN = votingAlgo.controlWord.voteInfo.get(key).getPVN();
+                if (tempLVN == votingAlgo.controlWord.M) {
+                    votingAlgo.controlWord.Logical.add(key);
+                }
+                if (tempPVN == votingAlgo.controlWord.M) {
+                    votingAlgo.controlWord.Physical.add(key);
+                }
             });
 
-            System.out.println("Physical = "+votingAlgo.controlWord.Physical);
-            System.out.println("Logical  = "+votingAlgo.controlWord.Logical);
+            System.out.println("Physical = " + votingAlgo.controlWord.Physical);
+            System.out.println("Logical  = " + votingAlgo.controlWord.Logical);
             votingAlgo.controlWord.isCopyCurrent = (votingAlgo.controlWord.Physical.contains(Integer.valueOf(this.Id)));
             //System.out.println("isCopyCurrent = "+votingAlgo.controlWord.isCopyCurrent);
             //( votingAlgo.controlWord.M == votingAlgo.controlWord.PVN );
 
-            if(votingAlgo.controlWord.Physical.isEmpty()) {
+            if (votingAlgo.controlWord.Physical.isEmpty()) {
                 // S is not in a distinguished partition
                 exitReturn = false;
             } else {
                 // get RU from any site in logical
                 int N = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Logical.get(0)).getRU();
                 int DS = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Logical.get(0)).getDS();
-                if(votingAlgo.controlWord.Logical.size() > (N/2)) {
+                if (votingAlgo.controlWord.Logical.size() > (N / 2)) {
                     // S is in a distinguished partition
                     exitReturn = true;
-                } else if( (votingAlgo.controlWord.Logical.size() == (N/2)) & (votingAlgo.controlWord.Logical.contains(DS))) {
+                } else if ((votingAlgo.controlWord.Logical.size() == (N / 2)) & (votingAlgo.controlWord.Logical.contains(DS))) {
                     // S is in a distinguished partition
                     exitReturn = true;
                 } else {
@@ -271,17 +222,16 @@ public class Server {
     public void doCatchUp() {
         System.out.println("Getting updates from site that has latest copy!");
         synchronized (votingAlgo.controlWord) {
-            System.out.println("Older version of file = "+votingAlgo.controlWord.PVN);
+            System.out.println("Older version of file = " + votingAlgo.controlWord.PVN);
             serverSocketConnectionHashMap.get(votingAlgo.controlWord.Physical.get(0)).sendGetMissingUpdates(votingAlgo.controlWord.PVN);
             try {
                 votingAlgo.controlWord.wait();
-            }
-            catch (InterruptedException e) {
+            } catch (InterruptedException e) {
                 System.out.println("interrupt");
             }
             votingAlgo.controlWord.PVN = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Physical.get(0)).getPVN();
             // TODO: implement re-synchronizing of file copies here
-            System.out.println("Updated version of file = "+votingAlgo.controlWord.PVN);
+            System.out.println("Updated version of file = " + votingAlgo.controlWord.PVN);
         }
     }
 
@@ -291,20 +241,20 @@ public class Server {
         synchronized (votingAlgo.controlWord) {
             votingAlgo.controlWord.LVN = votingAlgo.controlWord.M + 1;
             votingAlgo.controlWord.PVN = votingAlgo.controlWord.M + 1;
-            votingAlgo.controlWord.RU  = votingAlgo.controlWord.target_msg_count;
+            votingAlgo.controlWord.RU = votingAlgo.controlWord.target_msg_count;
             // TODO: DS update
             // votingAlgo.controlWord.DS  = ;
             serverSocketConnectionHashMap.keySet().forEach(key -> {
-                if(votingAlgo.controlWord.Physical.contains(Integer.valueOf(key))) {
+                if (votingAlgo.controlWord.Physical.contains(Integer.valueOf(key))) {
                     //System.out.println("Physical contains "+key);
-                    serverSocketConnectionHashMap.get(key).sendCommit(votingAlgo.controlWord.LVN,votingAlgo.controlWord.RU,votingAlgo.controlWord.DS,"UPDATE_FILE");
+                    serverSocketConnectionHashMap.get(key).sendCommit(votingAlgo.controlWord.LVN, votingAlgo.controlWord.RU, votingAlgo.controlWord.DS, "UPDATE_FILE");
                 } else {
                     //System.out.println("Physical not contains "+key);
-                    serverSocketConnectionHashMap.get(key).sendCommit(votingAlgo.controlWord.LVN,votingAlgo.controlWord.RU,votingAlgo.controlWord.DS,"NULL");
+                    serverSocketConnectionHashMap.get(key).sendCommit(votingAlgo.controlWord.LVN, votingAlgo.controlWord.RU, votingAlgo.controlWord.DS, "NULL");
                 }
             });
         }
-        
+
     }
 
     // check node lock and process vote request
@@ -316,11 +266,11 @@ public class Server {
         System.out.println("update_command = " + update);
         synchronized (votingAlgo.controlWord) {
             votingAlgo.controlWord.LVN = LVN;
-            votingAlgo.controlWord.RU  = RU;
-            votingAlgo.controlWord.DS  = DS;
+            votingAlgo.controlWord.RU = RU;
+            votingAlgo.controlWord.DS = DS;
             Pattern NULL = Pattern.compile("^NULL$");
             Matcher m_NULL = NULL.matcher(update);
-            if(!m_NULL.find()) {
+            if (!m_NULL.find()) {
                 // TODO: update file here pulled from commit message
                 System.out.println("File also updated with commit");
                 votingAlgo.controlWord.PVN = LVN;
@@ -335,24 +285,55 @@ public class Server {
         }
     }
 
-    public synchronized void processCloseConnectionAck(){
-        
+    public synchronized void processCloseConnectionAck(String severResponding) {
+        this.dropConnectionCounter -= 1;
+        System.out.println("Removing Sever Id " + severResponding + " from connection list");
+        serverSocketConnectionHashMap.remove(severResponding);
+        if (dropConnectionCounter == 0) {
+            serverSocketConnectionHashMap.get("100").sendPhaseMoveAck();
+        }
     }
 
-    public synchronized void processDropConnection (String dropConnectionWith){
+    public synchronized void processCloseConnectionRequest(String serverRequesting) {
+        System.out.println("Removing Sever Id " + serverRequesting + " from connection list");
+        serverSocketConnectionHashMap.remove(serverRequesting);
+    }
+
+    public synchronized void processDropConnection(String dropConnectionWith) {
         System.out.println("INSIDE PROCESS DROP CONNECTION");
         Integer dropConnectionIndex;
-        this.dropConnectionCouter = dropConnectionWith.length();
-        for(dropConnectionIndex = 0; dropConnectionIndex < dropConnectionWith.length(); dropConnectionIndex+=1){
+        this.dropConnectionCounter = dropConnectionWith.length();
+        for (dropConnectionIndex = 0; dropConnectionIndex < dropConnectionWith.length(); dropConnectionIndex += 1) {
             serverSocketConnectionHashMap.get(String.valueOf(dropConnectionWith.charAt(dropConnectionIndex))).closeSocketServer();
         }
 
     }
 
 
-    public synchronized void processRejoinConnection ( String rejoinConnectionWith){
+    public synchronized void processRejoinConnection(String rejoinConnectionWith, Server current) {
         System.out.print("INSIDE REJOIN CONNECTION");
+        try {
+            System.out.println("CONNECTING SERVER AS PART OF REJOIN CONNECTION");
+            Integer serverId;
+            for (serverId = Integer.valueOf(this.Id) + 1; serverId < allServerNodes.size(); serverId++) {
+                if (rejoinConnectionWith.contains(serverId.toString())) {
+                    Socket serverConnection = new Socket(this.allServerNodes.get(serverId).getIpAddress(), Integer.valueOf(allServerNodes.get(serverId).getPort()));
+                    SocketForServer socketForServer = new SocketForServer(serverConnection, this.getId(), true, current);
+                    if (socketForServer.getRemote_id() == null) {
+                        socketForServer.setRemote_id(Integer.toString(serverId));
+                    }
+                    serverSocketConnectionHashMap.put(socketForServer.getRemote_id(), socketForServer);
+                }
+                else {
+                    System.out.println(serverId.toString() + " is not part of reconnection request");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error while connecting to server");
+        }
+        serverSocketConnectionHashMap.get("100").sendPhaseMoveAck();
     }
+
     /*Open a socket to list to connection request*/
     public void serverSocket(Integer serverId, Server currentServer) {
         try {
@@ -380,7 +361,6 @@ public class Server {
                     try {
                         Socket s = server.accept();
                         SocketForServer socketForServer = new SocketForServer(s, Id, false, currentServer);
-                        serverSocketConnectionList.add(socketForServer);
                         serverSocketConnectionHashMap.put(socketForServer.getRemote_id(), socketForServer);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -393,20 +373,65 @@ public class Server {
         current_node.start();
     }
 
+    public class CommandParser extends Thread {
 
-    public static void main(String[] args) {
-
-
-        if (args.length != 1) {
-            System.out.println("Usage: java Server <server-number>");
-            System.exit(1);
+        Server currentServer;
+        /*Command parser for server terminal */
+        Pattern STATUS = Pattern.compile("^STATUS$");
+        Pattern SETUP = Pattern.compile("^SETUP$");
+        Pattern WRITE = Pattern.compile("^WR$");
+        Pattern LIST = Pattern.compile("^LIST$");
+        Pattern CLOSE_SOCKET = Pattern.compile("^CLOSE_SOCKET$");
+        public CommandParser(Server currentServer) {
+            this.currentServer = currentServer;
         }
 
-        System.out.println("Starting the Server");
-        Server server = new Server();
-        server.setServerList();// set server list
-        server.serverSocket(Integer.valueOf(args[0]), server); // reserve a socket
-        server.createVotingAlgorithmInstance();
-        System.out.println("Started the Server");
+        int rx_cmd(Scanner cmd) {
+            String cmd_in = null;
+            if (cmd.hasNext())
+                cmd_in = cmd.nextLine();
+            Matcher m_STATUS = STATUS.matcher(cmd_in);
+            Matcher m_LIST = LIST.matcher(cmd_in);
+            Matcher m_SETUP = SETUP.matcher(cmd_in);
+            Matcher m_WRITE = WRITE.matcher(cmd_in);
+            Matcher m_CLOSE_SOCKET = CLOSE_SOCKET.matcher(cmd_in);
+
+
+            if (m_STATUS.find()) {
+                System.out.println("SERVER SOCKET STATUS:");
+                try {
+                    System.out.println("STATUS UP");
+                    System.out.println("SERVER ID: " + Id);
+                    System.out.println("SERVER IP ADDRESS: " + ipAddress);
+                    System.out.println("SERVER PORT: " + port);
+                    System.out.println("CONNECTION WITH SERVER ID: " + serverSocketConnectionHashMap.keySet());
+                } catch (Exception e) {
+                    System.out.println("SOMETHING WENT WRONG IN TERMINAL COMMAND PROCESSOR");
+                }
+            } else if (m_SETUP.find()) {
+                setupConnections(currentServer);
+            } else if (m_WRITE.find()) {
+                currentServer.votingAlgo.requestUpdate();
+            } else if (m_LIST.find()) {
+                synchronized (serverSocketConnectionHashMap) {
+                    System.out.println("\n=== Connections to servers ===");
+                    serverSocketConnectionHashMap.keySet().forEach(key -> {
+                        System.out.println("key:" + key + " => ID " + serverSocketConnectionHashMap.get(key).remote_id);
+                    });
+                    System.out.println("=== size =" + serverSocketConnectionHashMap.size());
+                }
+            } else if (m_CLOSE_SOCKET.find()) {
+                testCloseSocket();
+            }
+
+            return 1;
+        }
+
+        public void run() {
+            System.out.println("Enter commands to set-up MESH Connection : TRIGGER");
+            Scanner input = new Scanner(System.in);
+            while (rx_cmd(input) != 0) {
+            }
+        }
     }
 }

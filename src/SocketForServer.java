@@ -114,14 +114,16 @@ public class SocketForServer {
             } else if (cmd_in.equals("CLOSE_SOCKET")) {
                 String serverRequesting = cmd.readLine();
                 System.out.println("Received close socket from SERVER_ID " + serverRequesting);
+                my_master.processCloseConnectionRequest(serverRequesting);
                 out.println("CLOSE_SOCKET_ACK");
                 out.println(this.my_id);
                 otherClient.close();
                 return 0;
             } else if (cmd_in.equals("CLOSE_SOCKET_ACK")) {
-                String serverRequesting = cmd.readLine();
-                System.out.println("Received close socket ACK from SERVER_ID " + serverRequesting);
+                String serverResponding = cmd.readLine();
+                System.out.println("Received close socket ACK from SERVER_ID" + serverResponding);
                 otherClient.close();
+                my_master.processCloseConnectionAck(serverResponding);
                 return 0;
             }
 
@@ -137,8 +139,8 @@ public class SocketForServer {
 
             else if( cmd_in.equals("REJOIN_CONNECTION")){
                 String rejoinConnectionWith = cmd.readLine();
-                System.out.println("DROP request received by " + this.my_id + "to drop connection with " + rejoinConnectionWith);
-                my_master.processRejoinConnection(rejoinConnectionWith);
+                System.out.println("REJOIN request received by " + this.my_id + "to REJOIN connection with " + rejoinConnectionWith);
+                my_master.processRejoinConnection(rejoinConnectionWith, my_master);
             }
 
 
@@ -242,4 +244,11 @@ public class SocketForServer {
         out.println(this.my_id);
 
     }
+
+    public synchronized void sendPhaseMoveAck(){
+        System.out.println("Sending drop connection phase move ack from server " + this.my_id + " to master node at 100");
+        out.println("PHASE_MOVE_ACK");
+        out.println(this.my_id);
+    }
+
 }
