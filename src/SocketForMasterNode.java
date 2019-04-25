@@ -61,8 +61,10 @@ public class SocketForMasterNode {
                 out.println(this.my_id);
             }
 
-            else if (cmd_in.equals("CLIENT_TEST")) {
-                System.out.println("CLIENT TEST RECEIVED");
+            else if (cmd_in.equals("PHASE_MOVE_ACK")) {
+                String ackSeverId = cmd.readLine();
+                System.out.println("Phase move ack received sent by server ID " + ackSeverId);
+                my_master.processPhaseMoveAck();
             }
 
         } catch (Exception e) {
@@ -74,5 +76,18 @@ public class SocketForMasterNode {
         System.out.println("Sending .... Master to Server ID test connection packer to server " );
         out.println("TEST_MASTER_SERVER_CONNECTION");
     }
+
+    public synchronized void dropConnection(String toSeverID, String dropConnectionWith){
+        System.out.println(" SENDING DROP CONNECTION WITH" + dropConnectionWith + " TO Sever ID " + toSeverID);
+        out.println("DROP_CONNECTION");
+        out.println(dropConnectionWith);
+    }
+
+    public synchronized void rejoinConnection(String toSeverID, String rejoinConnectionWith){
+        System.out.println(" SENDING DROP CONNECTION WITH" + rejoinConnectionWith + " TO Sever ID " + toSeverID);
+        out.println("REJOIN_CONNECTION");
+        out.println(rejoinConnectionWith);
+    }
+
 
 }

@@ -16,6 +16,7 @@ public class Server {
     List<SocketForServer> serverSocketConnectionList = new LinkedList<>();
     HashMap<String, SocketForServer> serverSocketConnectionHashMap = new HashMap<>();
     JMVAlgorithm votingAlgo = null;
+    Integer dropConnectionCouter;
 
     public String getId() {
         return Id;
@@ -42,7 +43,7 @@ public class Server {
         Pattern SETUP = Pattern.compile("^SETUP$");
         Pattern WRITE = Pattern.compile("^WR$");
         Pattern LIST = Pattern.compile("^LIST$");
-        Pattern CLOSE_SOKCET = Pattern.compile("^CLOSE_SOKCET$");
+        Pattern CLOSE_SOCKET = Pattern.compile("^CLOSE_SOCKET$");
 
         int rx_cmd(Scanner cmd) {
             String cmd_in = null;
@@ -52,7 +53,7 @@ public class Server {
             Matcher m_LIST = LIST.matcher(cmd_in);
             Matcher m_SETUP = SETUP.matcher(cmd_in);
             Matcher m_WRITE = WRITE.matcher(cmd_in);
-            Matcher m_CLOSE_SOCKET = CLOSE_SOKCET.matcher(cmd_in);
+            Matcher m_CLOSE_SOCKET = CLOSE_SOCKET.matcher(cmd_in);
 
 
             if (m_STATUS.find()) {
@@ -334,6 +335,24 @@ public class Server {
         }
     }
 
+    public synchronized void processCloseConnectionAck(){
+        
+    }
+
+    public synchronized void processDropConnection (String dropConnectionWith){
+        System.out.println("INSIDE PROCESS DROP CONNECTION");
+        Integer dropConnectionIndex;
+        this.dropConnectionCouter = dropConnectionWith.length();
+        for(dropConnectionIndex = 0; dropConnectionIndex < dropConnectionWith.length(); dropConnectionIndex+=1){
+            serverSocketConnectionHashMap.get(String.valueOf(dropConnectionWith.charAt(dropConnectionIndex))).closeSocketServer();
+        }
+
+    }
+
+
+    public synchronized void processRejoinConnection ( String rejoinConnectionWith){
+        System.out.print("INSIDE REJOIN CONNECTION");
+    }
     /*Open a socket to list to connection request*/
     public void serverSocket(Integer serverId, Server currentServer) {
         try {

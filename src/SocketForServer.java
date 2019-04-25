@@ -129,6 +129,19 @@ public class SocketForServer {
                 System.out.println("Received test packet for master and sever connection");
             }
 
+            else if (cmd_in.equals("DROP_CONNECTION")){
+                String dropConnectionWith = cmd.readLine();
+                System.out.println( " DROP request received by " + this.my_id +" to drop connection with " + dropConnectionWith);
+                my_master.processDropConnection(dropConnectionWith);
+            }
+
+            else if( cmd_in.equals("REJOIN_CONNECTION")){
+                String rejoinConnectionWith = cmd.readLine();
+                System.out.println("DROP request received by " + this.my_id + "to drop connection with " + rejoinConnectionWith);
+                my_master.processRejoinConnection(rejoinConnectionWith);
+            }
+
+
         } catch (Exception e) {
             System.out.println("Socket RX_cmd exception: Buffer close couldn't be handled graciously");
             System.out.println("*************** Closing Socket Connection *****************");
