@@ -20,7 +20,8 @@ public class MasterNode {
     List<SocketForMasterNode> socketConnectionListServer = new LinkedList<>();
     ServerSocket server;
     HashMap<String, SocketForMasterNode> socketConnectionHashMapServer = new HashMap<>();
-
+    List<List<AppCom>> commands = new LinkedList<>();
+    Integer requiredPhaseMoveAck = 0;
 
     public MasterNode(String id) {
         this.Id = id;
@@ -48,6 +49,9 @@ public class MasterNode {
         /*Pattern matching, command parsing from terminal*/
         Pattern STATUS = Pattern.compile("^STATUS$");
         Pattern TEST_CONNECTION = Pattern.compile("^TEST_CONNECTION$");
+        Pattern PHASE_ONE = Pattern.compile("^PHASE_ONE$");
+        Pattern PHASE_TWO = Pattern.compile("^PHASE_TWO$");
+        Pattern PHASE_THREE = Pattern.compile("^PHASE_THREE$");
 
         int rx_cmd(Scanner cmd) {
             String cmd_in = null;
@@ -55,7 +59,9 @@ public class MasterNode {
                 cmd_in = cmd.nextLine();
             Matcher m_STATUS = STATUS.matcher(cmd_in);
             Matcher m_TEST_CONNECTION = TEST_CONNECTION.matcher(cmd_in);
-
+            Matcher m_PHASE_ONE = PHASE_ONE.matcher(cmd_in);
+            Matcher m_PHASE_TWO = PHASE_TWO.matcher(cmd_in);
+            Matcher m_PHASE_THREE = PHASE_THREE.matcher(cmd_in);
 
             if (m_STATUS.find()) {
                 System.out.println("MASTER SOCKET STATUS:");
@@ -75,6 +81,18 @@ public class MasterNode {
                 }
             }
 
+            else if(m_PHASE_ONE.find()){
+                current.moveToOne();
+            }
+
+            else if(m_PHASE_TWO.find()){
+                current.moveToTwo();
+
+            }
+            else if(m_PHASE_THREE.find()){
+                current.moveToThree();
+            }
+
             return 1;
         }
 
@@ -86,6 +104,37 @@ public class MasterNode {
     }
 
 
+    public void moveToOne(){
+        System.out.println(" Moving severs from phase 0 to 1");
+        List<AppCom> phaseOneCommands = this.commands.get(0);
+        System.out.println(phaseOneCommands.toString());
+        this.requiredPhaseMoveAck = 2;
+        this.socketConnectionHashMapServer.get("0").dropConnection("0", "12");
+        this.socketConnectionHashMapServer.get("1").dropConnection("1","2");
+
+    }
+
+    public void moveToTwo(){
+        System.out.println(" Moving servers from phase 1 to 2");
+        List<AppCom> phaseTwoCommands = this.commands.get(1);
+        System.out.println(phaseTwoCommands.toString());
+    }
+
+    public void moveToThree(){
+        System.out.println(" Moving servers from phase 2 to 3");
+        List<AppCom> phaseThreeCommands = this.commands.get(2);
+        System.out.println(phaseThreeCommands.toString());
+    }
+
+    public synchronized void processPhaseMoveAck() {
+        this.requiredPhaseMoveAck -=1;
+        if(this.requiredPhaseMoveAck == 0 ){
+            System.out.println("PHASE MOVE COMPLETE");
+        }
+        else{
+            System.out.println("WAITING ON PHASE MOVE COMPLETION BY " + this.requiredPhaseMoveAck + " Number of Severs");
+        }
+    }
     /*Helps establish the socket connection to all the servers available*/
     public void setupServerConnection(MasterNode current) {
         try {
@@ -187,6 +236,25 @@ public class MasterNode {
 
     }
 
+    public void setUpCommands(){
+        System.out.println("*******SETTING PHASE MOVE COMMANDS *******");
+        List<AppCom> phaseOne = new LinkedList<>();
+        phaseOne.add(new AppCom("0","4567"));
+        phaseOne.add(new AppCom("1","4567"));
+        phaseOne.add(new AppCom("2","4567"));
+        phaseOne.add(new AppCom("3","4567"));
+        this.commands.add(phaseOne);
+        List<AppCom> phaseTwo = new LinkedList<>();
+        phaseTwo.add(new AppCom("0","123"));
+        phaseTwo.add(new AppCom("7","456"));
+        this.commands.add(phaseTwo);
+        List<AppCom> phaseThree = new LinkedList<>();
+        phaseThree.add(new AppCom("1","456"));
+        phaseThree.add(new AppCom("2","456"));
+        phaseThree.add(new AppCom("3","456"));
+        this.commands.add(phaseThree);
+        System.out.println("******* PHASE MOVE COMMAND SETUP COMPLETED *******");
+    }
 
     public static void main(String[] args) {
 
@@ -197,11 +265,17 @@ public class MasterNode {
 
 
         System.out.println("Starting the MasterNode");
-
-        MasterNode M1 = new MasterNode(args[0]); // Create MasterNode instance//Reads from client file and adds it to list of clients
-        M1.setServerList(); // Reads from config_server file and adds it to list of server
+        MasterNode M1 = new MasterNode(args[0]); // Create MasterNode instance//Reads from client file and adds it to list of operatingClients
+        M1.setServerList();// Reads from config_server file and adds it to list of server
+        try {
+            TimeUnit.SECONDS.sleep(5);
+        }
+        catch (Exception e){
+            System.out.println("Crashed while wait to read file");
+        }
         M1.setupServerConnection(M1); // Used the method to establish TCP connection to server
-        M1.masterSocket(Integer.valueOf(args[0]), M1); // Reserve socket with port number
+        M1.masterSocket(Integer.valueOf(args[0]), M1);// Reserve socket with port number
+        M1.setUpCommands();
         System.out.println("Started MasterNode with ID: " + M1.getId());
     }
 }
