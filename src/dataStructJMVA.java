@@ -34,7 +34,7 @@ public class dataStructJMVA
     {
         this.LVN = 0;
         this.PVN = 0;
-        this.RU = 3;
+        this.RU = 8;
         this.DS = 0;
         this.M = -1;
         this.locked= false;

@@ -72,6 +72,20 @@ public class JMVAlgorithm
         my_master.serverSocketConnectionHashMap.keySet().forEach(key -> {
                 my_master.serverSocketConnectionHashMap.get(key).sendVoteRequest();
         });
+
+
+        if(my_master.serverSocketConnectionHashMap.isEmpty()) {
+            System.out.println("Only node in the partition!");
+            Thread v = new Thread() {
+                public void run() {
+                    my_master.executeVotingAlgorithm();
+                }
+            };
+            v.setDaemon(true);
+            v.setName("votingAlgorithm_ThreadInsideAlgo_onlyNodeInPartition");
+            v.start();
+
+        }
         
     }
 

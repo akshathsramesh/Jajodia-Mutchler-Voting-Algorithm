@@ -14,6 +14,7 @@ public class Server {
     String ipAddress;
     List<Node> allServerNodes = new LinkedList<>();
     HashMap<String, SocketForServer> serverSocketConnectionHashMap = new HashMap<>();
+    HashMap<String, SocketForServer> masterServerSocketConnectionHashMap = new HashMap<>();
     JMVAlgorithm votingAlgo = null;
     String fileObjectName = null;
     Integer dropConnectionCounter;
@@ -119,7 +120,7 @@ public class Server {
             System.out.println("received all INFO_REPLY messages for current partition");
             Thread v = new Thread() {
                 public void run() {
-                    executeVotingAlgorithm(requestingClientId, LVN, PVN, RU, DS);
+                    executeVotingAlgorithm();
                 }
             };
             v.setDaemon(true);
@@ -128,7 +129,7 @@ public class Server {
         }
     }
 
-    public void executeVotingAlgorithm(String requestingClientId, int LVN, int PVN, int RU, int DS) {
+    public void executeVotingAlgorithm() {
         boolean distinguished = false;
         boolean isCopyCurrent = false;
         synchronized (votingAlgo.controlWord) {
@@ -264,7 +265,7 @@ public class Server {
             writeToFile(this.fileObjectName,votingAlgo.controlWord.potentialUpdate);
             votingAlgo.controlWord.LVN = votingAlgo.controlWord.M + 1;
             votingAlgo.controlWord.PVN = votingAlgo.controlWord.M + 1;
-            votingAlgo.controlWord.RU = votingAlgo.controlWord.target_msg_count;
+            votingAlgo.controlWord.RU = (votingAlgo.controlWord.target_msg_count+1);
             // TODO: DS update
             // votingAlgo.controlWord.DS  = ;
             synchronized (serverSocketConnectionHashMap) {
@@ -364,7 +365,7 @@ public class Server {
         System.out.println("Removing Sever Id " + severResponding + " from connection list");
         serverSocketConnectionHashMap.remove(severResponding);
         if (dropConnectionCounter == 0) {
-            serverSocketConnectionHashMap.get("100").sendPhaseMoveAck();
+            masterServerSocketConnectionHashMap.get("100").sendPhaseMoveAck();
         }
     }
 
@@ -405,7 +406,7 @@ public class Server {
         } catch (Exception e) {
             System.out.println("Error while connecting to server");
         }
-        serverSocketConnectionHashMap.get("100").sendPhaseMoveAck();
+        masterServerSocketConnectionHashMap.get("100").sendPhaseMoveAck();
     }
 
     /*Open a socket to list to connection request*/
@@ -435,7 +436,11 @@ public class Server {
                     try {
                         Socket s = server.accept();
                         SocketForServer socketForServer = new SocketForServer(s, Id, false, currentServer);
-                        serverSocketConnectionHashMap.put(socketForServer.getRemote_id(), socketForServer);
+                        if(Integer.valueOf(socketForServer.getRemote_id()) <= 7) {
+                            serverSocketConnectionHashMap.put(socketForServer.getRemote_id(), socketForServer);
+                        } else {
+                            masterServerSocketConnectionHashMap.put(socketForServer.getRemote_id(), socketForServer);
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -497,6 +502,13 @@ public class Server {
                         System.out.println("key:" + key + " => ID " + serverSocketConnectionHashMap.get(key).remote_id);
                     });
                     System.out.println("=== size =" + serverSocketConnectionHashMap.size());
+                }
+                synchronized (masterServerSocketConnectionHashMap) {
+                    System.out.println("\n=== Connections to masters ===");
+                    masterServerSocketConnectionHashMap.keySet().forEach(key -> {
+                        System.out.println("key:" + key + " => ID " + masterServerSocketConnectionHashMap.get(key).remote_id);
+                    });
+                    System.out.println("=== size =" + masterServerSocketConnectionHashMap.size());
                 }
                 synchronized (votingAlgo.controlWord) {
                     System.out.println("Site STATS");
