@@ -34,11 +34,13 @@ public class JMVAlgorithm
     }
 
     // method to request an update / determine votes
-    public void requestUpdate()
+    public void requestUpdate(String Update)
     {
         boolean lock = false;
         int target = 0;
         int ts = 0;
+        Pattern NULL = Pattern.compile("^NULL$");
+        Matcher m_NULL = NULL.matcher(Update);
         synchronized(controlWord)
         {
             lock = controlWord.locked;
@@ -59,6 +61,11 @@ public class JMVAlgorithm
             // set variables;
             controlWord.target_msg_count = my_master.serverSocketConnectionHashMap.size();
             controlWord.received_msg_count = 0;
+            if (m_NULL.find()) {
+                controlWord.potentialUpdate = Integer.toString(controlWord.PVN+1);
+            } else {
+                controlWord.potentialUpdate = Update;
+            }
         }
 
         // send VOTE_REQUEST message to all sites

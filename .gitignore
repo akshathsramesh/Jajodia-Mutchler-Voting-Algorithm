@@ -3,4 +3,5 @@
 out/
 *.class
 src/buffer.txt
+src/file_S*
 *.swp

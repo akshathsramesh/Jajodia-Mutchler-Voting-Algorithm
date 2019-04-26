@@ -28,6 +28,7 @@ public class dataStructJMVA
     List<Integer> Logical = null;
     List<Integer> Physical= null;
     List<String> Updates= null;
+    String potentialUpdate = null;
     // constructor takes site ID
     dataStructJMVA(int ME)
     {
@@ -53,7 +54,5 @@ public class dataStructJMVA
         this.voteInfo.clear();
         this.Logical.clear();
         this.Physical.clear();
-        // TODO: possible bug
-        this.Updates.clear();
     }
 }

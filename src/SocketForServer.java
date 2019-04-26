@@ -161,7 +161,7 @@ public class SocketForServer {
         System.out.println("send MISSING_UPDATES to" + this.remote_id);
         out.println("MISSING_UPDATES");
         synchronized (my_master.votingAlgo.controlWord) {
-            for(int i = remotePVN-1;i<my_master.votingAlgo.controlWord.Updates.size();i++) {
+            for(int i = remotePVN;i<my_master.votingAlgo.controlWord.Updates.size();i++) {
                 out.println(my_master.votingAlgo.controlWord.Updates.get(i));
             }
             out.println("EOM");
@@ -185,6 +185,8 @@ public class SocketForServer {
                     String update = rd_in;
                     synchronized (my_master.votingAlgo.controlWord) {
                         my_master.votingAlgo.controlWord.Updates.add(update);
+                        my_master.writeToFile(my_master.fileObjectName,update);
+                        ++my_master.votingAlgo.controlWord.PVN;
                     }
                 } 
                 else { break; }  // break out of loop when EOM is received
@@ -197,6 +199,7 @@ public class SocketForServer {
         }
         synchronized (my_master.votingAlgo.controlWord) {
             my_master.votingAlgo.controlWord.notifyAll();
+            System.out.println("notify catchup");
         }
     }
 
