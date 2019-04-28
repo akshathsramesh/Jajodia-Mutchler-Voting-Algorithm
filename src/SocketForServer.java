@@ -31,6 +31,7 @@ public class SocketForServer {
                 System.out.println("SEND_YOUR_ID request sent");
                 remote_id = in.readLine();
                 System.out.println("SEND_YOUR_ID request: response received with ID: " + remote_id);
+                out.println("CONNECTION_ACK");
             }
         } catch (Exception e) {
 
@@ -143,6 +144,24 @@ public class SocketForServer {
                 my_master.processRejoinConnection(rejoinConnectionWith, my_master);
             }
 
+            else if (cmd_in.equals("AUTO_SETUP")){
+                System.out.println("AUTO SETUP RECEIVED AT THE SERVER - TRIGGERING SET UP CONNECTION");
+                my_master.autoSetup();
+            }
+
+            else if(cmd_in.equals("CONNECTION_ACK")){
+                System.out.println("CONNECTION ack received by " + this.my_id);
+                my_master.processConnectionAck();
+            }
+            else if(cmd_in.equals("PING")){
+                out.println("PONG");
+                out.println(this.my_id);
+            }
+            else if( cmd_in.equals("PONG")){
+                String pongServerId = cmd.readLine();
+                System.out.println("RECEIVED PONG FROM " + pongServerId);
+            }
+
 
         } catch (Exception e) {
             System.out.println("Socket RX_cmd exception: Buffer close couldn't be handled graciously");
@@ -252,6 +271,16 @@ public class SocketForServer {
         System.out.println("Sending drop connection phase move ack from server " + this.my_id + " to master node at 100");
         out.println("PHASE_MOVE_ACK");
         out.println(this.my_id);
+    }
+
+
+    public synchronized void sendAutoSetup(String serverID){
+        System.out.println("Sending AUTO setUp to Sever with ID: " + serverID);
+        out.println("AUTO_SETUP");
+    }
+
+    public synchronized void sendPing(){
+        out.println("PING");
     }
 
 }

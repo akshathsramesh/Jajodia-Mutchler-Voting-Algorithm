@@ -18,6 +18,8 @@ public class Server {
     JMVAlgorithm votingAlgo = null;
     String fileObjectName = null;
     Integer dropConnectionCounter;
+    Boolean autoConnectionEnabled = true;
+    Integer connectionAckReq;
 
     public static void main(String[] args) {
 
@@ -51,6 +53,7 @@ public class Server {
 
     public void setupConnections(Server current) {
         try {
+            connectionAckReq = allServerNodes.size() - (Integer.valueOf(this.Id) + 1);
             System.out.println("CONNECTING SERVER");
             Integer serverId;
             for (serverId = Integer.valueOf(this.Id) + 1; serverId < allServerNodes.size(); serverId++) {
@@ -65,6 +68,25 @@ public class Server {
             }
         } catch (Exception e) {
             System.out.println("Error while connecting to server");
+        }
+    }
+
+    public synchronized void autoSetup (){
+        System.out.println("Inside auto setup process");
+        if(autoConnectionEnabled) {
+            this.setupConnections(this);
+        }
+        else {
+            System.out.println("AUTO CONNECTION DISABLED");
+        }
+    }
+
+    public synchronized void processConnectionAck(){
+        System.out.println("Inside process connection ACK");
+        this.connectionAckReq -=1;
+        if(this.connectionAckReq == 0 && Integer.valueOf(this.Id) < this.allServerNodes.size() - 2 && autoConnectionEnabled){
+            System.out.println("---------------- SEND PROGRESSIVE CONNECTION REQUEST -------------------");
+            serverSocketConnectionHashMap.get(String.valueOf(Integer.valueOf(this.Id) + 1)).sendAutoSetup(String.valueOf(Integer.valueOf(this.Id) + 1));
         }
     }
 
@@ -384,6 +406,11 @@ public class Server {
 
     }
 
+    public synchronized void sendPing(){
+        serverSocketConnectionHashMap.keySet().forEach(key -> {
+            serverSocketConnectionHashMap.get(key).sendPing();
+        });
+    }
 
     public synchronized void processRejoinConnection(String rejoinConnectionWith, Server current) {
         System.out.print("INSIDE REJOIN CONNECTION");
@@ -462,6 +489,8 @@ public class Server {
         Pattern WRITE_STRING = Pattern.compile("^W (.*)$");
         Pattern LIST = Pattern.compile("^LIST$");
         Pattern CLOSE_SOCKET = Pattern.compile("^CLOSE_SOCKET$");
+        Pattern PING = Pattern.compile("^PING$");
+
         public CommandParser(Server currentServer) {
             this.currentServer = currentServer;
         }
@@ -476,7 +505,7 @@ public class Server {
             Matcher m_WRITE = WRITE.matcher(cmd_in);
             Matcher m_WRITE_STRING = WRITE_STRING.matcher(cmd_in);
             Matcher m_CLOSE_SOCKET = CLOSE_SOCKET.matcher(cmd_in);
-
+            Matcher m_PING = PING.matcher(cmd_in);
 
             if (m_STATUS.find()) {
                 System.out.println("SERVER SOCKET STATUS:");
@@ -524,7 +553,11 @@ public class Server {
                 }
             } else if (m_CLOSE_SOCKET.find()) {
                 testCloseSocket();
-            } else {
+            }
+            else if (m_PING.find()){
+                sendPing();
+            }
+            else {
                 System.out.println("Unknown command : enter proper command");
             }
 
