@@ -32,8 +32,8 @@ public class dataStructJMVA
     // constructor takes site ID
     dataStructJMVA(int ME)
     {
-        this.LVN = 0;
-        this.PVN = 0;
+        this.LVN = 1;
+        this.PVN = 1;
         this.RU = 8;
         this.DS = 0;
         this.M = -1;

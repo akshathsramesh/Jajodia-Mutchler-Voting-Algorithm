@@ -31,6 +31,7 @@ public class JMVAlgorithm
     {
         this.my_master = my_master;
         this.controlWord = new dataStructJMVA(Integer.valueOf(my_master.Id));
+        clearTheFile(my_master.fileObjectName);
     }
 
     // method to request an update / determine votes
@@ -69,26 +70,167 @@ public class JMVAlgorithm
         }
 
         // send VOTE_REQUEST message to all sites
-        my_master.serverSocketConnectionHashMap.keySet().forEach(key -> {
+        synchronized (my_master.serverSocketConnectionHashMap) {
+            my_master.serverSocketConnectionHashMap.keySet().forEach(key -> {
                 my_master.serverSocketConnectionHashMap.get(key).sendVoteRequest();
-        });
-
+            });
+        }
 
         if(my_master.serverSocketConnectionHashMap.isEmpty()) {
             System.out.println("Only node in the partition!");
             Thread v = new Thread() {
                 public void run() {
-                    my_master.executeVotingAlgorithm();
+                    executeVotingAlgorithm();
                 }
             };
             v.setDaemon(true);
             v.setName("votingAlgorithm_ThreadInsideAlgo_onlyNodeInPartition");
             v.start();
-
         }
-        
     }
 
+    public void executeVotingAlgorithm() {
+        boolean distinguished = false;
+        boolean isCopyCurrent = false;
+        synchronized (controlWord) {
+            // put my stats also along with others stats in voteInfo
+            DSmessage my_obj = new DSmessage(controlWord.LVN, controlWord.PVN, controlWord.RU, controlWord.DS);
+            controlWord.voteInfo.put(Integer.valueOf(my_master.Id), my_obj);
+        }
+        // check if partition is distinguished and proceed further
+        distinguished = isDistinguished();
+
+        if (distinguished) {
+            // get flag : is file copy current in this site ?
+            synchronized (controlWord) {
+                isCopyCurrent = controlWord.isCopyCurrent;
+            }
+
+            if (isCopyCurrent) {
+                System.out.println("File copy is current!");
+            } else {
+                doCatchUp();
+            }
+
+            doUpdateStats();
+            // sendMissingUpdates();
+            synchronized (controlWord) {
+                synchronized (my_master.serverSocketConnectionHashMap) {
+                    my_master.serverSocketConnectionHashMap.keySet().forEach(key -> {
+                        if (!controlWord.Physical.contains(Integer.valueOf(key))) {
+                            //System.out.println("Physical does not contain "+key);
+                            my_master.serverSocketConnectionHashMap.get(key).sendMissingUpdates(controlWord.voteInfo.get(Integer.valueOf(key)).getPVN());
+                        }
+                    });
+                }
+            }
+            // unlock site
+            printSiteStats();
+            synchronized (controlWord) {
+                controlWord.locked = false;
+            }
+            System.out.println("SITE UNLOCKED due to successful UPDATE and COMMIT");
+        } else {
+            //release lock and send abort to all in current partition
+            System.out.println("Not a distinguished partition: send ABORT to subordinates");
+            releaseAbort();
+            printSiteStats();
+        }
+    }
+
+    public boolean isDistinguished() {
+        // check if distinguished partition
+        boolean exitReturn = false;
+        synchronized (controlWord) {
+            // get max LVN in M
+            controlWord.voteInfo.keySet().forEach(key -> {
+                int tempLVN = controlWord.voteInfo.get(key).getLVN();
+                if (controlWord.M < tempLVN) {
+                    controlWord.M = tempLVN;
+                }
+            });
+
+            // gather votes
+            controlWord.voteInfo.keySet().forEach(key -> {
+                int tempLVN = controlWord.voteInfo.get(key).getLVN();
+                int tempPVN = controlWord.voteInfo.get(key).getPVN();
+                if (tempLVN == controlWord.M) {
+                    controlWord.Logical.add(key);
+                }
+                if (tempPVN == controlWord.M) {
+                    controlWord.Physical.add(key);
+                }
+            });
+
+            System.out.println("Physical = " + controlWord.Physical);
+            System.out.println("Logical  = " + controlWord.Logical);
+            controlWord.isCopyCurrent = (controlWord.Physical.contains(Integer.valueOf(my_master.Id)));
+            //System.out.println("isCopyCurrent = "+votingAlgo.controlWord.isCopyCurrent);
+            //( votingAlgo.controlWord.M == votingAlgo.controlWord.PVN );
+
+            if (controlWord.Physical.isEmpty()) {
+                // S is not in a distinguished partition
+                exitReturn = false;
+            } else {
+                // get RU from any site in logical
+                int N = controlWord.voteInfo.get(controlWord.Logical.get(0)).getRU();
+                int DS = controlWord.voteInfo.get(controlWord.Logical.get(0)).getDS();
+                if (controlWord.Logical.size() > (N / 2)) {
+                    // S is in a distinguished partition
+                    exitReturn = true;
+                } else if ((controlWord.Logical.size() == (N / 2)) & (controlWord.Logical.contains(DS))) {
+                    // S is in a distinguished partition
+                    exitReturn = true;
+                } else {
+                    // S is not in a distinguished partition
+                    exitReturn = false;
+                }
+            }
+        }
+        return exitReturn;
+    }
+    public void doCatchUp() {
+        System.out.println("Getting updates from site that has latest copy!");
+        synchronized (controlWord) {
+            System.out.println("Older version of file = " + controlWord.PVN);
+            synchronized (my_master.serverSocketConnectionHashMap) {
+                my_master.serverSocketConnectionHashMap.get(Integer.toString(controlWord.Physical.get(0))).sendGetMissingUpdates(controlWord.PVN);
+            }
+            try {
+                System.out.println("waiting to catchup");
+                controlWord.wait();
+            } catch (InterruptedException e) {
+                System.out.println("interrupt");
+            }
+            //votingAlgo.controlWord.PVN = votingAlgo.controlWord.voteInfo.get(votingAlgo.controlWord.Physical.get(0)).getPVN();
+            System.out.println("Updated version of file = " + controlWord.PVN);
+        }
+        System.out.println("done catchup");
+    }
+    public void doUpdateStats() {
+        System.out.println("Updating the file for as per current given request");
+        synchronized (controlWord) {
+            controlWord.Updates.add(controlWord.potentialUpdate);
+            writeToFile(my_master.fileObjectName,controlWord.potentialUpdate);
+            controlWord.LVN = controlWord.M + 1;
+            controlWord.PVN = controlWord.M + 1;
+            controlWord.RU = (controlWord.target_msg_count+1);
+            // TODO: DS update
+            // votingAlgo.controlWord.DS  = ;
+            synchronized (my_master.serverSocketConnectionHashMap) {
+                my_master.serverSocketConnectionHashMap.keySet().forEach(key -> {
+                    if (controlWord.Physical.contains(Integer.valueOf(key))) {
+                        //System.out.println("Physical contains "+key);
+                        my_master.serverSocketConnectionHashMap.get(key).sendCommit(controlWord.LVN, controlWord.RU, controlWord.DS, controlWord.potentialUpdate);
+                    } else {
+                        //System.out.println("Physical not contains "+key);
+                        my_master.serverSocketConnectionHashMap.get(key).sendCommit(controlWord.LVN, controlWord.RU, controlWord.DS, "NULL");
+                    }
+                });
+            }
+        }
+
+    }
     // synchronized method to release resource/ critical section
     public void releaseAbort()
     {
@@ -104,10 +246,128 @@ public class JMVAlgorithm
         }
 
         // send ABORT message to all sites
-        my_master.serverSocketConnectionHashMap.keySet().forEach(key -> {
+        synchronized (my_master.serverSocketConnectionHashMap) {
+            my_master.serverSocketConnectionHashMap.keySet().forEach(key -> {
                 my_master.serverSocketConnectionHashMap.get(key).sendAbort();
-        });
+            });
+        }
 
     }
 
+    // check node lock and process vote request
+    public synchronized void processInfoReply(String requestingClientId, int LVN, int PVN, int RU, int DS) {
+        int current = -1;
+        int target = 0;
+        DSmessage obj = new DSmessage(LVN, PVN, RU, DS);
+        System.out.println("processing INFO_REPLY from S" + requestingClientId);
+        System.out.println("LVN = " + LVN);
+        System.out.println("PVN = " + PVN);
+        System.out.println("RU = " + RU);
+        System.out.println("DS = " + DS);
+        synchronized (controlWord) {
+            ++controlWord.received_msg_count;
+            controlWord.voteInfo.put(Integer.valueOf(requestingClientId), obj);
+            current = controlWord.received_msg_count;
+            target = controlWord.target_msg_count;
+        }
+        if (target == current) {
+            System.out.println("received all INFO_REPLY messages for current partition");
+            Thread v = new Thread() {
+                public void run() {
+                    executeVotingAlgorithm();
+                }
+            };
+            v.setDaemon(true);
+            v.setName("votingAlgorithm_Thread");
+            v.start();
+        }
+    }
+
+
+    public void printSiteStats() {
+        synchronized (controlWord) {
+            System.out.println("Site STATS");
+            System.out.println("LVN = " + controlWord.LVN);
+            System.out.println("PVN = " + controlWord.PVN);
+            System.out.println("RU = " + controlWord.RU);
+            System.out.println("DS = " + controlWord.DS);
+        }
+    }
+
+    // check node lock and process vote request
+    public synchronized void processCommit(String requestingClientId, int LVN, int RU, int DS, String update) {
+        System.out.println("processing COMMIT from S" + requestingClientId);
+        System.out.println("LVN = " + LVN);
+        System.out.println("RU = " + RU);
+        System.out.println("DS = " + DS);
+        System.out.println("update_command = " + update);
+        synchronized (controlWord) {
+            controlWord.LVN = LVN;
+            controlWord.RU = RU;
+            controlWord.DS = DS;
+            Pattern NULL = Pattern.compile("^NULL$");
+            Matcher m_NULL = NULL.matcher(update);
+            if (!m_NULL.find()) {
+                controlWord.Updates.add(update);
+                writeToFile(my_master.fileObjectName,update);
+                System.out.println("File also updated with commit");
+                controlWord.PVN = LVN;
+            }
+            controlWord.locked = false;
+            printSiteStats();
+            System.out.println("SITE UNLOCKED due to COMMIT");
+        }
+    }
+
+    // method to clear the contents of the file when starting up
+    // adapted from StackOverflow
+    public void clearTheFile(String filename) {
+        try
+        {
+            FileWriter fwOb = new FileWriter("./"+filename, false); 
+            PrintWriter pwOb = new PrintWriter(fwOb, false);
+            pwOb.write("");
+            pwOb.flush();
+            pwOb.close();
+            fwOb.close();
+        }
+        catch (FileNotFoundException e) 
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        catch (IOException e) 
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+    // write to file
+    public void writeToFile(String filename,String content)
+    {
+        // directory is based on serverID
+        File file = new File("./"+filename);
+	if (!file.exists()) 
+        {
+	    System.out.println("File "+filename+" does not exist");
+            return;
+	}
+        try
+        {
+            // write / append to the file
+            FileWriter fw = new FileWriter(file, true);
+            fw.write(content+"\n");
+            fw.close();
+        }
+        catch (FileNotFoundException e) 
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        catch (IOException e) 
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
 }

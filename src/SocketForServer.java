@@ -91,13 +91,14 @@ public class SocketForServer {
                 int PVN = Integer.valueOf(in.readLine());
                 int RU = Integer.valueOf(in.readLine());
                 int DS = Integer.valueOf(in.readLine());
-                my_master.processInfoReply(this.remote_id, LVN, PVN, RU, DS);
+                my_master.votingAlgo.processInfoReply(this.remote_id, LVN, PVN, RU, DS);
             } else if (cmd_in.equals("ABORT")) {
                 System.out.println("Received ABORT from S" + this.remote_id);
                 synchronized (my_master.votingAlgo.controlWord) {
                     my_master.votingAlgo.controlWord.locked = false;
                     System.out.println("SITE UNLOCKED due to ABORT");
                 }
+                my_master.votingAlgo.printSiteStats();
             } else if (cmd_in.equals("GET_MISSING_UPDATES")) {
                 System.out.println("Received GET_MISSING_UPDATES from S" + this.remote_id);
                 int rPVN = Integer.valueOf(in.readLine());
@@ -105,13 +106,14 @@ public class SocketForServer {
             } else if (cmd_in.equals("MISSING_UPDATES")) {
                 System.out.println("Received MISSING_UPDATES from S" + this.remote_id);
                 processMissingUpdates();
+                my_master.votingAlgo.printSiteStats();
             } else if (cmd_in.equals("COMMIT")) {
                 System.out.println("Received COMMIT from S" + this.remote_id);
                 int LVN = Integer.valueOf(in.readLine());
                 int RU = Integer.valueOf(in.readLine());
                 int DS = Integer.valueOf(in.readLine());
                 String update = in.readLine();
-                my_master.processCommit(this.remote_id, LVN, RU, DS, update);
+                my_master.votingAlgo.processCommit(this.remote_id, LVN, RU, DS, update);
             } else if (cmd_in.equals("CLOSE_SOCKET")) {
                 String serverRequesting = cmd.readLine();
                 System.out.println("Received close socket from SERVER_ID " + serverRequesting);
@@ -180,7 +182,7 @@ public class SocketForServer {
         System.out.println("send MISSING_UPDATES to" + this.remote_id);
         out.println("MISSING_UPDATES");
         synchronized (my_master.votingAlgo.controlWord) {
-            for(int i = remotePVN;i<my_master.votingAlgo.controlWord.Updates.size();i++) {
+            for(int i = remotePVN-1;i<my_master.votingAlgo.controlWord.Updates.size();i++) {
                 out.println(my_master.votingAlgo.controlWord.Updates.get(i));
             }
             out.println("EOM");
@@ -204,7 +206,7 @@ public class SocketForServer {
                     String update = rd_in;
                     synchronized (my_master.votingAlgo.controlWord) {
                         my_master.votingAlgo.controlWord.Updates.add(update);
-                        my_master.writeToFile(my_master.fileObjectName,update);
+                        my_master.votingAlgo.writeToFile(my_master.fileObjectName,update);
                         ++my_master.votingAlgo.controlWord.PVN;
                     }
                 } 
