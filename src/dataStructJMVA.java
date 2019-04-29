@@ -14,7 +14,7 @@ public class dataStructJMVA
     public int RU;
     // distinguished site ID
     public int DS;
-
+    // maximal logical version number
     public int M;
 
     // counters to identify end of a transaction based on connections available in current partition
@@ -24,7 +24,9 @@ public class dataStructJMVA
     // file locked? boolean flag to atomicize transaction (based on 2-phase commit protocol)
     public boolean locked;
     public boolean isCopyCurrent;
+    // data structure to store all reply info messages
     HashMap<Integer, DSmessage> voteInfo = null;
+    // data structure to process and run algorithm
     List<Integer> Logical = null;
     List<Integer> Physical= null;
     List<String> Updates= null;
@@ -48,6 +50,7 @@ public class dataStructJMVA
         this.Updates  = new LinkedList<String>();
     }
 
+    // reset data structure for new round of voting
     public void clearAllInfo() {
         this.isCopyCurrent = false;
         this.M = -1;

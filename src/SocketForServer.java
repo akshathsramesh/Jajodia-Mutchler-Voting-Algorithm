@@ -61,6 +61,7 @@ public class SocketForServer {
             if (cmd_in.equals("SEND_YOUR_ID")) {
                 System.out.println("Received SEND_YOUR_ID - Replying with my ID: " + this.my_id);
                 out.println(this.my_id);
+            // send vote information to requestor
             } else if (cmd_in.equals("VOTE_REQUEST")) {
                 System.out.println("Received VOTE_REQUEST from S" + this.remote_id);
                 boolean lock = false;
@@ -85,6 +86,7 @@ public class SocketForServer {
                         sendInfoReply(LVN, PVN, RU, DS);
                     }
                 }
+            // process the reply for vote_request
             } else if (cmd_in.equals("INFO_REPLY")) {
                 System.out.println("Received INFO_REPLY from S" + this.remote_id);
                 int LVN = Integer.valueOf(in.readLine());
@@ -92,6 +94,7 @@ public class SocketForServer {
                 int RU = Integer.valueOf(in.readLine());
                 int DS = Integer.valueOf(in.readLine());
                 my_master.votingAlgo.processInfoReply(this.remote_id, LVN, PVN, RU, DS);
+            // handle abort condition
             } else if (cmd_in.equals("ABORT")) {
                 System.out.println("Received ABORT from S" + this.remote_id);
                 synchronized (my_master.votingAlgo.controlWord) {
@@ -99,14 +102,17 @@ public class SocketForServer {
                     System.out.println("SITE UNLOCKED due to ABORT");
                 }
                 my_master.votingAlgo.printSiteStats();
+            // send missing updates
             } else if (cmd_in.equals("GET_MISSING_UPDATES")) {
                 System.out.println("Received GET_MISSING_UPDATES from S" + this.remote_id);
                 int rPVN = Integer.valueOf(in.readLine());
                 sendMissingUpdates(rPVN);
+            // process missing updates
             } else if (cmd_in.equals("MISSING_UPDATES")) {
                 System.out.println("Received MISSING_UPDATES from S" + this.remote_id);
                 processMissingUpdates();
                 my_master.votingAlgo.printSiteStats();
+            // process commit message
             } else if (cmd_in.equals("COMMIT")) {
                 System.out.println("Received COMMIT from S" + this.remote_id);
                 int LVN = Integer.valueOf(in.readLine());
@@ -181,10 +187,12 @@ public class SocketForServer {
     public synchronized void sendMissingUpdates(int remotePVN) {
         System.out.println("send MISSING_UPDATES to" + this.remote_id);
         out.println("MISSING_UPDATES");
+        // send the missing updates based on the received version number
         synchronized (my_master.votingAlgo.controlWord) {
             for(int i = remotePVN-1;i<my_master.votingAlgo.controlWord.Updates.size();i++) {
                 out.println(my_master.votingAlgo.controlWord.Updates.get(i));
             }
+            // end of transmission
             out.println("EOM");
         }
     }
@@ -194,7 +202,7 @@ public class SocketForServer {
         Pattern eom = Pattern.compile("^EOM");
         String rd_in = null;
         Matcher m_eom = eom.matcher("start");  // initializing the matcher. "start" does not mean anything
-        // get filenames till EOM message is received and update the files list
+        // get updates till EOM message is received and add to updates list
         try
         {
             while(!m_eom.find())
@@ -204,6 +212,7 @@ public class SocketForServer {
                 if(!m_eom.find())
                 {
                     String update = rd_in;
+                    // add the update, increment the version number and write to file
                     synchronized (my_master.votingAlgo.controlWord) {
                         my_master.votingAlgo.controlWord.Updates.add(update);
                         my_master.votingAlgo.writeToFile(my_master.fileObjectName,update);

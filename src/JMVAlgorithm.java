@@ -57,7 +57,6 @@ public class JMVAlgorithm
         {
             controlWord.locked = true;
             controlWord.clearAllInfo();
-            System.out.println("SITE LOCKED for new update request");
 
             // set variables;
             controlWord.target_msg_count = my_master.serverSocketConnectionHashMap.size();
@@ -67,6 +66,8 @@ public class JMVAlgorithm
             } else {
                 controlWord.potentialUpdate = Update;
             }
+            System.out.println("New WRITE/UPDATE requested with update string="+controlWord.potentialUpdate);
+            System.out.println("SITE LOCKED for new update request");
         }
 
         // send VOTE_REQUEST message to all sites
@@ -76,6 +77,7 @@ public class JMVAlgorithm
             });
         }
 
+        // only node in the partition
         if(my_master.serverSocketConnectionHashMap.isEmpty()) {
             System.out.println("Only node in the partition!");
             Thread v = new Thread() {
@@ -164,6 +166,7 @@ public class JMVAlgorithm
 
             System.out.println("Physical = " + controlWord.Physical);
             System.out.println("Logical  = " + controlWord.Logical);
+            // physical set contains this site ID ? then current
             controlWord.isCopyCurrent = (controlWord.Physical.contains(Integer.valueOf(my_master.Id)));
             //System.out.println("isCopyCurrent = "+votingAlgo.controlWord.isCopyCurrent);
             //( votingAlgo.controlWord.M == votingAlgo.controlWord.PVN );
@@ -189,6 +192,8 @@ public class JMVAlgorithm
         }
         return exitReturn;
     }
+
+    // get missing updates from a site that has latest copy of file
     public void doCatchUp() {
         System.out.println("Getting updates from site that has latest copy!");
         synchronized (controlWord) {
@@ -207,6 +212,8 @@ public class JMVAlgorithm
         }
         System.out.println("done catchup");
     }
+
+    // update and commit 
     public void doUpdateStats() {
         System.out.println("Updating the file for as per current given request");
         synchronized (controlWord) {
@@ -229,9 +236,9 @@ public class JMVAlgorithm
                 });
             }
         }
-
     }
-    // synchronized method to release resource/ critical section
+
+    // send abort to all sites
     public void releaseAbort()
     {
         synchronized(controlWord)
@@ -270,6 +277,7 @@ public class JMVAlgorithm
             current = controlWord.received_msg_count;
             target = controlWord.target_msg_count;
         }
+        // run voting algorithm when all replies received
         if (target == current) {
             System.out.println("received all INFO_REPLY messages for current partition");
             Thread v = new Thread() {
@@ -294,7 +302,7 @@ public class JMVAlgorithm
         }
     }
 
-    // check node lock and process vote request
+    // check node lock and process commit message
     public synchronized void processCommit(String requestingClientId, int LVN, int RU, int DS, String update) {
         System.out.println("processing COMMIT from S" + requestingClientId);
         System.out.println("LVN = " + LVN);
@@ -342,7 +350,8 @@ public class JMVAlgorithm
             e.printStackTrace();
         }
     }
-    // write to file
+
+    // write to file 
     public void writeToFile(String filename,String content)
     {
         // directory is based on serverID
