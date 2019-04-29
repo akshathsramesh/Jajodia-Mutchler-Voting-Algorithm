@@ -16,6 +16,8 @@ public class dataStructJMVA
     public int DS;
     // maximal logical version number
     public int M;
+    // smallest site ID in current partition
+    public int S;
 
     // counters to identify end of a transaction based on connections available in current partition
     public int target_msg_count;
@@ -39,6 +41,8 @@ public class dataStructJMVA
         this.RU = 8;
         this.DS = 0;
         this.M = -1;
+        // should ideally be int MAX_VALUE; but nodes are limited - works
+        this.S = 100;
         this.locked= false;
         this.isCopyCurrent= false;
         this.target_msg_count = -1;
@@ -54,6 +58,7 @@ public class dataStructJMVA
     public void clearAllInfo() {
         this.isCopyCurrent = false;
         this.M = -1;
+        this.S = 100;
         this.voteInfo.clear();
         this.Logical.clear();
         this.Physical.clear();

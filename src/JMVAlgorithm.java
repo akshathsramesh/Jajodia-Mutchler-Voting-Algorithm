@@ -144,11 +144,15 @@ public class JMVAlgorithm
         // check if distinguished partition
         boolean exitReturn = false;
         synchronized (controlWord) {
-            // get max LVN in M
+            // get max LVN to M, get the min site ID to S
             controlWord.voteInfo.keySet().forEach(key -> {
                 int tempLVN = controlWord.voteInfo.get(key).getLVN();
+                int tempS = Integer.valueOf(key);
                 if (controlWord.M < tempLVN) {
                     controlWord.M = tempLVN;
+                }
+                if (controlWord.S > tempS) {
+                    controlWord.S = tempS;
                 }
             });
 
@@ -222,8 +226,11 @@ public class JMVAlgorithm
             controlWord.LVN = controlWord.M + 1;
             controlWord.PVN = controlWord.M + 1;
             controlWord.RU = (controlWord.target_msg_count+1);
-            // TODO: DS update
-            // votingAlgo.controlWord.DS  = ;
+            // DS update if RU is even : pick lexicographically lowest site ID in current partition
+            if( (controlWord.RU % 2) == 0) {
+                controlWord.DS  = controlWord.S;
+                System.out.println("sites cardinality is even, thus update DS to "+controlWord.DS);
+            }
             synchronized (my_master.serverSocketConnectionHashMap) {
                 my_master.serverSocketConnectionHashMap.keySet().forEach(key -> {
                     if (controlWord.Physical.contains(Integer.valueOf(key))) {
